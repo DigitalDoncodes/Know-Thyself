@@ -43,7 +43,7 @@ import os
 app = Flask(__name__)
 
 # Get the Mongo URI from Render (or .env for local)
-app.config['DigitalDoncodes'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
+app.config['DigitalDoncodes'] = os.environ.get('DigitalDoncodes')
 
 mongo = PyMongo(app)
 
