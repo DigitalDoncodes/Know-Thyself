@@ -51,7 +51,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 # Configure app settings
 app.config.from_mapping(
     SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret"),
-    MONGO_URI=os.getenv("MONGO_URI", "mongodb://localhost:27017/portal"),
+    app.config['MONGO_URI'] = os.environ.get('	mongodb+srv://DigitalDoncodes:YOUR_PASSWORD@cluster0.mongodb.net/jobportal?retryWrites=true&w=majority')
     UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "uploads"),
     MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)),  # 5MB default max upload size
     MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
