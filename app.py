@@ -43,7 +43,7 @@ import os
 app = Flask(__name__)
 
 # Get the Mongo URI from Render (or .env for local)
-app.config['MONGO_URI'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
+app.config['DigitalDoncodes'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
 
 mongo = PyMongo(app)
 
@@ -63,7 +63,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 # Configure app settings
 app.config.from_mapping(
     SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret"),
-    app.config['MONGO_URI'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
+    app.config['DigitalDoncodes'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
     UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "uploads"),
     MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)),  # 5MB default max upload size
     MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
