@@ -1352,7 +1352,6 @@ def about():
 
 # ---------- Run the app ----------
 if __name__ == '__main__':
-     app.debug = True  # Enable debug mode
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
 
 
