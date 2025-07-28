@@ -36,6 +36,18 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import pytz
 
+from flask import Flask
+from flask_pymongo import PyMongo
+import os
+
+app = Flask(__name__)
+
+# Get the Mongo URI from Render (or .env for local)
+app.config['MONGO_URI'] = os.environ.get('mongodb+srv://DigitalDoncodes:ArErnrlYgoIzg8iY@cluster0.mongodb.net/Know-Thyself?retryWrites=true&w=majority')
+
+mongo = PyMongo(app)
+
+
 IST = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(IST)
 deadline = now_ist + timedelta(hours=48)
