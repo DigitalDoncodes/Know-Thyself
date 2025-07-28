@@ -292,7 +292,7 @@ def upload_resume(job_id):
         return redirect(url_for('student_dashboard'))
 
     # Validate file type - allow PDF or Word Documents
-    # You can improve with python-magic or filename checks
+    # You can improve with filetype==1.2.0 or filename checks
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ['.pdf', '.doc', '.docx']:
         flash("Allowed file types are PDF, DOC, DOCX.", "warning")
