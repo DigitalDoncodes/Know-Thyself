@@ -1,6 +1,6 @@
 import os
 import datetime
-import magic
+import filetype
 from bson.objectid import ObjectId
 from flask import flash, redirect, url_for
 from flask_login import current_user, login_required
