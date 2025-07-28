@@ -43,6 +43,7 @@ import os
 app = Flask(__name__)
 
 # Get the Mongo URI from Render (or .env for local)
+import os
 app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
 
 mongo = PyMongo(app)
