@@ -18,3 +18,4 @@ xlsxwriter==3.2.5
 python-dateutil==2.9.0.post0
 bcrypt==4.0.1
 passlib==1.7.4
+python-magic==0.4.27
