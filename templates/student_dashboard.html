@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard{% endblock %}
+{% block head %}
+<style>
+.section-header {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #185a9d;
+  margin-bottom: 18px;
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  gap: 26px;
+  margin: 28px 0 38px 0;
+}
+.zoom-box, .job-box {
+  background: #fff;
+  border-radius: 20px;
+  border: 4px solid;
+  border-image: linear-gradient(60deg, #43cea2, #185a9d) 1;
+  box-shadow: 0 4px 18px #3c80e022;
+  padding: 32px 18px 20px;
+  position: relative;
+  transition: transform .16s, box-shadow .17s;
+  cursor: pointer;
+}
+.zoom-box:hover, .job-box:hover {
+  transform: scale(1.045);
+  box-shadow: 0 12px 30px #3a7de622;
+  z-index: 2;
+}
+.app-title { font-size: 1.09em; font-weight: 600; margin-bottom: 5px; }
+.app-status {
+  font-size: 1em; margin-bottom: 8px; color: #1976d2; font-weight: 500;
+}
+.app-deadline { font-size: 0.95em; margin-bottom: 6px; color: #444bbb;}
+.app-feedback { color: #388e3c; font-size:0.95em;}
+.job-title { font-size: 1.08em; font-weight: 600; margin-bottom: 9px; color: #1565c0; }
+.job-desc { color: #455; font-size: 0.95em; margin-bottom: 10px; min-height:38px;}
+.btn-action, .apply-btn {
+  background: linear-gradient(90deg, #42a5f5, #1976d2);
+  color: #fff; font-weight: bold; padding:8px 21px;
+  border: none; border-radius: 22px; margin-top: 11px;
+  text-decoration: none; display: inline-block;
+  transition: background .2s, transform .19s;
+}
+.btn-action:hover, .apply-btn:hover { background: #43cea2; color: #165228;}
+.growth-card {
+  background: linear-gradient(90deg, #fafafa, #e3f2fd 90%);
+  border: 3px solid #6a11cb;
+  border-radius: 22px;
+  box-shadow: 0 2px 14px #5090e120;
+  text-align: center;
+  padding: 32px 18px;
+  margin-bottom: 32px;
+}
+.growth-card-title { font-size: 1.18em; font-weight: 700; color: #2575fc; margin-bottom: 7px;}
+.growth-card-desc { color: #555; margin-bottom: 14px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="text-center my-3" style="color:#2575fc; font-size:2em;">Welcome, {{ current_user.name }}!</h1>
+  <div class="text-center mb-4">Manage Your Applications, Explore Jobs, and Grow 🚀</div>
+
+  <!-- 💡 Link to Growth Hub -->
+  <div class="growth-card">
+    <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Growth & Reflection Hub</div>
+    <div class="growth-card-desc">Complete 100 engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
+    <a href="{{ url_for('growth_menu') }}" class="btn-action">Go to Growth Hub</a>
+  </div>
+
+  <!-- 📄 Your Applications -->
+  <div class="section-header">Your Active Applications</div>
+  {% if apps %}
+    <div class="dashboard-grid">
+      {% for app in apps %}
+        <div class="zoom-box" tabindex="0">
+          <div class="app-title">{{ app.job.title }}</div>
+          <div class="app-status">{{ app.status.replace('_',' ').title() }}
+            {% if app.status_message %}<br><small>{{ app.status_message }}</small>{% endif %}
+          </div>
+          <div class="app-deadline">
+            {% if app.resume_deadline %}
+              Deadline: {{ app.resume_deadline.strftime('%d %b %Y, %I:%M %p') }} IST
+            {% endif %}
+          </div>
+          <div class="app-feedback">{{ app.teacher_feedback or 'No feedback yet.' }}</div>
+
+      {% if app.status in ["pending_resume", "corrections_needed"] %}
+  <form action="{{ url_for('upload', app_id=app._id) }}"
+        method="POST"
+        enctype="multipart/form-data"
+        class="d-flex flex-column">
+    <label class="form-label">Résumé File:</label>
+    <input type="file" name="resume" accept=".pdf,.doc,.docx" required class="form-control mb-2">
+
+    <label class="form-label">Photo File:</label>
+    <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
+
+    <button type="submit" class="btn btn-primary">
+      {% if app.status == 'corrections_needed' %} Re-upload {% else %} Upload {% endif %}
+    </button>
+  </form>
+
+  {% if app.teacher_feedback %}
+    <div class="alert alert-info mt-2">
+      <strong>Teacher's Feedback:</strong> {{ app.teacher_feedback }}
+    </div>
+  {% endif %}
+{% endif %}
+
+
+    </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center text-muted" style="font-size: 1.14em; padding: 19px; background: #eaf4fa; border-radius: 14px;">No active applications yet. Apply to a job below!</div>
+  {% endif %}
+
+  <!-- 💼 Available Jobs -->
+  <div class="section-header">Available Jobs</div>
+  {% if jobs %}
+    <div class="dashboard-grid">
+      {% for job in jobs %}
+        <div class="job-box">
+          <div class="job-title">{{ job.title }}</div>
+          <div class="job-desc">{{ job.description[:140] }}{% if job.description|length > 140 %}...{% endif %}</div>
+          <div style="color:#43a047;margin-bottom:4px;">Vacancies: {{ job.vacancies }}</div>
+          {% if current_user.is_authenticated and current_user.role == 'student' and job._id not in applied_ids %}
+            <form action="{{ url_for('apply', job_id=job._id) }}" method="POST" onsubmit="return confirm('Apply for this job? You must upload your résumé and photo within 48 hours.');">
+              <button type="submit" class="apply-btn">Apply Now</button>
+            </form>
+          {% elif job._id in applied_ids %}
+            <span class="btn-action" style="background:#b2dfdb; color:#234; cursor:default;">Already Applied</span>
+          {% else %}
+            <span class="text-muted"><em>Login as student to apply</em></span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center my-4"><p class="lead text-muted">No jobs available at the moment. Please check back soon!</p></div>
+  {% endif %}
+</div>
+{% endblock %}

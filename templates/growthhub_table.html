@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Growth Hub Reflections Table{% endblock %}
+
+{% block head %}
+<style>
+.table-responsive {
+  box-shadow: 0 12px 32px #41b6ec18;
+  background: #fbfbfd;
+  padding: 24px 12px 32px 12px;
+  border-radius: 18px;
+}
+.section-header {
+  font-size: 1.5rem;
+  color: #2575fc;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 36px;
+  margin-top: 12px;
+}
+#reflectionSearch {
+  margin-bottom: 26px;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: 10px;
+  font-size: 1.08em;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+  <h2 class="section-header">🌱 All Student Growth Hub Reflections</h2>
+  <div class="d-flex justify-content-end">
+    <input type="text" id="reflectionSearch" class="form-control" placeholder="🔍 Filter by name, ID, question, or answer...">
+  </div>
+
+  {% if growth_responses %}
+    <div class="table-responsive">
+      <table id="growth-reflection-table" class="table table-bordered table-hover">
+        <thead class="table-success text-center align-middle">
+          <tr>
+            <th>Student Name</th>
+            <th>Student ID</th>
+            <th>Activity Prompt</th>
+            <th>Answer</th>
+            <th>Submitted At</th>
+                <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+         <tbody>
+  {% for response in growth_responses %}
+    <tr>
+      <td>{{ response.name }}</td>
+      <td>{{ response.student_id }}</td>
+      <td>{{ response.question }}</td>
+      <td>{{ response.answer }}</td>
+      <td>
+        {% if response.submitted_at %}
+          {{ response.submitted_at.strftime('%d %b %Y, %I:%M %p') }}
+        {% else %} — {% endif %}
+      </td>
+      <td class="text-center">
+        <form method="POST" action="{{ url_for('delete_growth_response', response_id=response._id) }}">
+          <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this reflection?');">
+            🗑 Remove
+          </button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+</tbody>
+
+      </table>
+    </div>
+  {% else %}
+    <p class="text-center text-muted">No Growth Hub responses submitted yet.</p>
+  {% endif %}
+
+  <div class="text-center mt-5">
+    <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-outline-primary">&larr; Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('reflectionSearch');
+  input.addEventListener('keyup', function () {
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll('#growth-reflection-table tbody tr');
+    rows.forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

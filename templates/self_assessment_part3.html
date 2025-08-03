@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Self-Assessment - Part 3{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card p-5 shadow-lg rounded-4">
+        <h2 class="text-center fw-bold mb-4 text-primary">Self-Assessment - Final Question</h2>
+        <p class="text-center text-muted">One last question to complete your reflection.</p>
+        
+        <form method="POST" action="{{ url_for('self_assessment') }}">
+            {{ form.csrf_token }}
+            
+            <div class="mb-4">
+                <label for="q5" class="form-label fw-bold">{{ form.q5.label }}</label>
+                {{ form.q5(class="form-control", rows="4", placeholder="Your answer here...") }}
+            </div>
+            
+            <div class="d-grid mt-4">
+                {{ form.submit(class="btn btn-success btn-lg") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

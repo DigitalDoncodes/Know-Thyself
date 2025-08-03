@@ -1,0 +1,111 @@
+<!-- Resume Guidelines Modal -->
+<div class="modal fade" id="cvGuidelinesModal" tabindex="-1" aria-labelledby="cvGuidelinesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg rounded-5" style="overflow:visible;">
+      <style>
+      /* Professional, boxy modal styles for Bootstrap */
+      .modal-header-gradient {
+        background: linear-gradient(100deg, #2575fc 0%, #43cea2 100%);
+        border-radius: 1.2rem 1.2rem 0 0;
+        padding: 1.1rem 1.7rem 1.1rem 1.4rem;
+        color: #fff;
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        box-shadow: 0 4px 18px #41b6ec26;
+        border-bottom: none;
+        text-align: left;
+      }
+      .modal-title-glow {
+        font-family: 'Quicksand', 'Montserrat', Arial, sans-serif;
+        font-size: 1.6em;
+        font-weight: 700;
+        letter-spacing: .5px;
+        text-shadow: 0 2px 14px #49cac855, 0 1px 0 #1111;
+      }
+      .box-section {
+        background: #f7faff;
+        border-radius: 1.1rem;
+        box-shadow: 0 2px 16px #2894c622, 0 0.5rem 2rem -0.5rem #8bece822;
+        padding: 1.15rem 1.2rem 1.15rem 1.5rem;
+        margin-bottom: 1.3em;
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      }
+      .box-section h6 {
+        font-family: 'Quicksand', 'Montserrat', Arial, sans-serif;
+        font-weight: 700;
+        font-size: 1.12em;
+        color: #135175;
+        margin-bottom: 8px;
+      }
+      .resume-list li,
+      .box-section ol li {
+        font-size: 1.04em;
+        font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        margin-bottom: 7px;
+        line-height: 1.7;
+        letter-spacing: .02em;
+      }
+      .resume-list li i {
+        color: #2575fc;
+        margin-right: 6px;
+        font-size: 1.15em;
+      }
+      .highlight {
+        color: #21753c;
+        font-weight: 600;
+        font-size: 1.01em;
+      }
+      .modal-footer.bg-box {
+        background: linear-gradient(90deg, #f2fdff 60%, #e9fadb 100%);
+        border-radius: 0 0 1rem 1rem;
+        border: none;
+      }
+      /* Smooth font/box shadow for extra professionalism */
+      </style>
+
+      <div class="modal-header-gradient">
+        <h5 class="modal-title-glow" id="cvGuidelinesLabel"><i class="fas fa-file-alt me-2"></i>Resume Guidelines</h5>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4" style="background:#fcfefe;">
+        <div class="box-section mb-4 shadow-sm">
+          <h6>📝 Upload Rules</h6>
+          <ol class="ps-4 mb-0">
+            <li>Create a single <span class="highlight">PDF résumé</span> (not Word or image).</li>
+            <li>Upload within <span class="highlight">48 hours</span> of clicking “Apply”.</li>
+            <li>File size must be <span class="highlight">≤ 5 MB</span>.</li>
+          </ol>
+        </div>
+        <div class="box-section mb-3 shadow-sm">
+          <h6>✅ Mandatory Resume Contents</h6>
+          <ul class="resume-list list-unstyled mb-1">
+            <li><i class="fas fa-user"></i>Name &amp; Email</li>
+            <li><i class="fas fa-info-circle"></i>Professional summary</li>
+            <li><i class="fas fa-graduation-cap"></i>Education</li>
+            <li><i class="fas fa-tools"></i>Skills</li>
+            <li><i class="fas fa-award"></i>Key achievements</li>
+            <li><i class="fas fa-briefcase"></i>Professional experience</li>
+            <li><i class="fas fa-lightbulb"></i>Projects</li>
+            <li><i class="fas fa-certificate"></i>Certificates &amp; courses</li>
+            <li><i class="fas fa-medal"></i>Awards &amp; recognition</li>
+            <li><i class="fas fa-users"></i>Leadership &amp; extracurriculars</li>
+            <li><i class="fas fa-language"></i>Additional info <span class="text-muted">(e.g. Languages)</span></li>
+          </ul>
+        </div>
+        <div class="box-section px-3 py-2" style="background:#f2fff0;">
+          <span class="fw-semibold text-primary">Pro tip:</span> <span class="text-dark">Tailor your resume based on the job you want!</span>
+        </div>
+        <div class="text-end mt-3">
+          <small>
+            For help, contact the
+            <a href="{{ url_for('support') }}" class="fw-bold text-decoration-underline text-success">
+              support centre
+            </a>.
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer bg-box justify-content-end pb-3 pt-2 px-4">
+        <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal" style="font-size:1.1em;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

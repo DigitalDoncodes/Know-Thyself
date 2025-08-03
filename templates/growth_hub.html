@@ -1,0 +1,93 @@
+
+{% block title %}50-Topic Growth Hub{% endblock %}
+
+{% block head %}
+<style>
+  html {
+    scroll-behavior: smooth;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+  .prompt-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease;
+  }
+  .prompt-card:hover {
+    transform: translateY(-4px);
+  }
+  .prompt-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1565c0;
+  }
+  .prompt-go {
+    align-self: flex-end;
+    margin-top: auto;
+    padding: 8px 16px;
+    background: #1976d2;
+    color: white;
+    font-weight: bold;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  section {
+    background: #f9f9f9;
+    padding: 25px;
+    margin-bottom: 35px;
+    border-radius: 12px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  }
+  .submit-button {
+    background: #1976d2;
+    color: white;
+    padding: 14px 30px;
+    margin: 40px auto;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    display: block;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <h1 class="text-center mb-4">🌱 Self-Discovery Hub: Choose a Topic</h1>
+
+  <!-- 💠 TOP CARD GRID WITH 50 MODULES -->
+  <div class="card-grid">
+    {% for module in modules %}
+      <div class="prompt-card">
+        <div class="prompt-title">{{ loop.index }}. {{ module.title }}</div>
+        <a href="#q{{ loop.index }}" class="prompt-go">Go</a>
+      </div>
+    {% endfor %}
+  </div>
+
+  <hr class="my-5">
+
+  <!-- 💌 FULL FORM AREA -->
+  <form method="POST" action="{{ url_for('growth_hub_submit') }}">
+    {% for module in modules %}
+      <section id="q{{ loop.index }}">
+        <h4>{{ loop.index }}. {{ module.title }}</h4>
+        {{ module.html|safe }}
+      </section>
+    {% endfor %}
+
+    <button type="submit" class="submit-button">🚀 Submit All Reflections</button>
+  </form>
+</div>
+{% endblock %}

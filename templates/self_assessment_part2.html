@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Self-Assessment - Part 2{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card p-5 shadow-lg rounded-4">
+        <h2 class="text-center fw-bold mb-4 text-primary">Self-Assessment - Part 2/3</h2>
+        <p class="text-center text-muted">Please rate your confidence and mood on a scale of 1-10.</p>
+        
+        <form method="POST" action="{{ url_for('self_assessment') }}">
+            {{ form.csrf_token }}
+            
+            <div class="mb-4">
+                <label for="q3" class="form-label fw-bold">{{ form.q3.label }}</label>
+                {{ form.q3(class="form-control", placeholder="e.g., 8") }}
+            </div>
+            
+            <div class="mb-4">
+                <label for="q4" class="form-label fw-bold">{{ form.q4.label }}</label>
+                {{ form.q4(class="form-control", placeholder="e.g., 8") }}
+            </div>
+            
+            <div class="d-grid mt-4">
+                {{ form.submit(class="btn btn-primary btn-lg") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

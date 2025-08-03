@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center min-vh-100 bg-light">
+  <div class="card shadow-lg p-4 rounded-4 animate__animated animate__fadeIn" style="max-width: 420px; width: 100%;">
+    <h2 class="text-center fw-bold mb-4 text-primary">Create Your Account</h2>
+    <form method="POST" action="{{ url_for('register') }}">
+      {{ form.csrf_token }}
+
+      <div class="mb-3">
+        <label for="fullName" class="form-label">Full Name</label>
+        {{ form.name(class="form-control", id="fullName", placeholder="Your full name", required=true, autofocus=true) }}
+      </div>
+
+      <div class="mb-3">
+        <label for="studentID" class="form-label">Student ID</label>
+        {{ form.student_id(class="form-control", id="studentID", placeholder="Your student ID", required=true) }}
+      </div>
+
+      <div class="mb-3">
+        <label for="emailAddress" class="form-label">Email address</label>
+        {{ form.email(class="form-control", id="emailAddress", placeholder="name@example.com", required=true) }}
+      </div>
+
+      <div class="mb-3">
+        <label for="phone" class="form-label">Phone</label>
+        {{ form.phone(class="form-control", id="phone", placeholder="Your phone number", required=true) }}
+      </div>
+
+      <div class="mb-3">
+        <label for="password1" class="form-label">Password</label>
+        {{ form.password(class="form-control", id="password1", placeholder="******", required=true) }}
+      </div>
+
+      <div class="mb-3">
+        <label for="password2" class="form-label">Confirm Password</label>
+        {{ form.confirm(class="form-control", id="password2", placeholder="Re-enter password", required=true) }}
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100 mt-3">Register</button>
+    </form>
+
+    <div class="text-center mt-4">
+      <small class="text-muted">
+        Already have an account? <a href="{{ url_for('login') }}" class="text-decoration-none text-primary">Login here</a>.
+      </small>
+    </div>
+  </div>
+</div>
+
+<style>
+  body {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  .card {
+    background-color: white;
+  }
+  .form-label {
+    font-weight: 600;
+  }
+</style>
+{% endblock %}

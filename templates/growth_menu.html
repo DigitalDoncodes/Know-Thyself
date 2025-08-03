@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Growth Activities{% endblock %}
+{% block head %}
+<style>
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 24px;
+    margin: 38px 0 40px 0;
+  }
+  .growth-card {
+    background: #fff;
+    border-radius: 22px;
+    border: 4px solid;
+    border-image: linear-gradient(60deg, #6a11cb 50%, #43cea2 100%) 1;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+    min-height: 135px;
+    text-align: center;
+    position: relative;
+    transition: transform 0.18s;
+    padding: 34px 14px 16px 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .growth-card.done {
+    background: linear-gradient(96deg, #e8f5e9 70%, #b9f6ca 100%);
+    border-image: linear-gradient(90deg, #43a047 80%, #82e9de) 1;
+  }
+  .growth-icon {
+    font-size: 1.6em;
+    margin-bottom: 5px;
+    display: block;
+  }
+  .growth-title {
+    font-size: 1.06em;
+    font-weight: 600;
+    margin-bottom: 7px;
+    color: #2774c3;
+  }
+  .growth-desc {
+    color: #555b;
+    font-size: 0.98em;
+    min-height: 28px;
+  }
+  .growth-go {
+    margin: 18px auto 0 auto;
+    background: #1565c0;
+    color: #fff;
+    border-radius: 18px;
+    font-weight: bold;
+    padding: 6px 22px;
+    text-decoration: none;
+    border: none;
+    font-size: 1em;
+    box-shadow: 0 2px 8px #0288d122;
+    display: inline-block;
+    transition: background 0.17s, color 0.17s, transform 0.15s;
+  }
+  .growth-go:hover { background: #43a047; color: #fff; }
+  .status-mark {
+    position: absolute; right: 15px; top: 12px; font-size: 1.35em; opacity: 0.82;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-center my-3">🌱 Explore Growth & Reflection Activities</h1>
+    <p class="text-center text-muted mb-4">Click “Go” under any card to begin. Completed activities are marked.</p>
+  <a href="{{ url_for('growth_random') }}" class="btn btn-outline-primary btn-lg">
+    🎲 I’m Feeling Curious (Random)
+  </a>
+</div>
+    <div class="card-grid">
+    
+        {% for activity in activities %}
+          <div class="growth-card {% if activity.done %}done{% endif %}">
+            <span class="growth-icon">{{ activity.icon }}</span>
+            <div class="growth-title">{{ loop.index }}. {{ activity.title }}</div>
+            <div class="growth-desc">{{ activity.desc }}</div>
+            <a href="{{ url_for('growth_question', qid=activity.id) }}" class="growth-go">Go</a>
+            {% if activity.done %}
+              <span class="status-mark" title="Done">✔️</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

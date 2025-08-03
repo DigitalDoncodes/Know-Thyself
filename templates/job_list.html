@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Available Jobs{% endblock %}
+
+{% block head %}
+<style>
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px,1fr));
+  gap: 28px;
+  margin-top: 25px;
+}
+.job-box {
+  background: #fff;
+  border-radius: 22px;
+  border: 4px solid;
+  border-image: linear-gradient(45deg, #29b6f6, #6a11cb) 1;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  padding: 28px 22px 20px;
+  transition: transform .18s, box-shadow .2s;
+  position: relative;
+  cursor: pointer;
+}
+.job-box:hover {
+  transform: scale(1.06);
+  box-shadow: 0 12px 32px #5d8ec233, 0 2px 8px #0001;
+  z-index: 2;
+}
+.job-title {
+  font-size: 1.18em;
+  font-weight: 700;
+  color: #1a237e;
+  margin-bottom: 10px;
+}
+.job-desc {
+  color: #444;
+  margin-bottom: 13px;
+  font-size: .97em;
+}
+.btn-apply {
+  background: linear-gradient(90deg, #42a5f5, #1976d2);
+  color: #fff;
+  border: none;
+  border-radius: 26px;
+  padding: 9px 22px;
+  margin-top: 7px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-apply:hover {
+  background: linear-gradient(90deg, #1976d2, #43cea2);
+}
+.applied-badge {
+  position: absolute; top: 10px; right: 12px;
+  background: #4caf50;
+  color: #fff;
+  padding: 5px 14px;
+  font-size: .96em;
+  border-radius: 30px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="text-center my-3">
+  <h2>📋 Open Job Listings</h2>
+  <p class="text-muted">Browse and apply for internships or assistantships best suited to your interests.</p>
+</div>
+{% if jobs %}
+  <div class="card-grid">
+    {% for job in jobs %}
+      <div class="job-box" data-aos="fade-up" data-aos-delay="{{ loop.index * 80 }}">
+        {% if job._id in applied_ids %}
+          <span class="applied-badge">Applied</span>
+        {% endif %}
+        <div class="job-title">{{ job.title }}</div>
+        <div class="job-desc">{{ job.description[:150] }}{% if job.description|length > 150 %}...{% endif %}</div>
+        {% if current_user.is_authenticated and current_user.role == 'student' and job._id not in applied_ids %}
+          <form action="{{ url_for('apply', job_id=job._id) }}" method="POST">
+            <button type="submit" class="btn-apply">Apply Now</button>
+          </form>
+        {% elif not current_user.is_authenticated %}
+          <a href="{{ url_for('login') }}" class="btn-apply">Login to Apply</a>
+        {% else %}
+          <span class="text-muted"><em>You have already applied</em></span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="text-center my-5"><p class="lead text-muted">There are currently no open jobs. Please check back later.</p></div>
+{% endif %}
+{% endblock %}

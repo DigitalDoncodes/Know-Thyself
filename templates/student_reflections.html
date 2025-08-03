@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Student Reflections{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center fw-bold mb-4 text-primary">Student Self-Assessment Reflections</h2>
+    
+    {% if reflections %}
+        {% for reflection in reflections %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <strong>{{ reflection.student_name }}</strong> ({{ reflection.student_id }})
+                    <span class="text-muted float-end">{{ reflection.submission_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>Q1:</strong> {{ reflection.q1_answer }}</p>
+                    <p><strong>Q2:</strong> {{ reflection.q2_answer }}</p>
+                    <p><strong>Q3:</strong> {{ reflection.q3_answer }}</p>
+                    <p><strong>Q4:</strong> {{ reflection.q4_answer }}</p>
+                    <p><strong>Q5:</strong> {{ reflection.q5_answer }}</p>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-center text-muted">No student reflections have been submitted yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
