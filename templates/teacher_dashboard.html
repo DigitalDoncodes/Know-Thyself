@@ -2,7 +2,6 @@
 {% block title %}Teacher Dashboard{% endblock %}
 
 {% block head %}
-
 <style>
 body {
   background: linear-gradient(135deg, #f5faff 0%, #e3eefa 100%);
@@ -73,6 +72,24 @@ body {
   text-decoration: none;
   display: inline-block;
 }
+.data-box {
+  background: linear-gradient(110deg,#f6f8fc 80%,#dee8ff 100%);
+  border-radius: 18px;
+  border: 4px solid transparent;
+  border-image: linear-gradient(45deg,#43cea2,#2575fc) 1 stretch;
+  padding: 28px;
+  box-shadow: 0 4px 18px #155acf15;
+  margin-bottom: 30px;
+}
+.data-box {
+  background: linear-gradient(110deg,#f6f8fc 80%,#dee8ff 100%);
+  border-radius: 18px;
+  border: 4px solid transparent;
+  border-image: linear-gradient(45deg,#43cea2,#2575fc) 1 stretch;
+  padding: 28px;
+  box-shadow: 0 4px 18px #155acf15;
+  margin-bottom: 30px;
+}
 .function-btn:hover {
   filter: brightness(1.08); transform: scale(1.055);
   box-shadow: 0 7px 16px #22b1e589;
@@ -92,6 +109,8 @@ body {
 <div class="dashboard-container">
 
   <h2 class="mb-4"><span style="color:#1565c0;"></span> Teacher Dashboard</h2>
+  {# REMOVED: Duplicate flash message display block #}
+  {#
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -102,8 +121,8 @@ body {
       {% endfor %}
     {% endif %}
   {% endwith %}
+  #}
 
-  <!-- ⭐ Function Boxes -->
   <div class="function-grid">
     <div class="function-box box-7">
        <div class="function-title">My Growth Hub</div>
@@ -129,7 +148,7 @@ body {
     <div class="function-box box-5">
       <div class="function-title">Clear Applications</div>
       <div class="function-desc">Remove pending/incomplete applications.</div>
-      <a href="{{ url_for('clear_applications') }}" class="function-btn">Go</a>
+      <a href="{{ url_for('clear_application') }}" class="function-btn">Go</a>
     </div>
     <div class="function-box box-6">
       <div class="function-title">Registered Students</div>
@@ -141,12 +160,16 @@ body {
       <div class="function-desc">Access all Growth Hub activity data and see student progress.</div>
       <a href="{{ url_for('view_growthhub_reflections') }}" class="function-btn">Go</a>
     </div>
+    <div class="function-box box-8">
+      <div class="function-title">Self-Assessment Reflections</div>
+      <div class="function-desc">View and manage student self-assessment data.</div>
+      <a href="{{ url_for('view_student_reflections') }}" class="function-btn">Go</a>
+    </div>
     <div class="function-box box-1">
      <div class="function-title">Create Job</div>
       <div class="function-desc">Post a new job for students to apply.</div>
       <a href="{{ url_for('new_job') }}" class="function-btn">Go</a>
-</div>
-
+    </div>
   </div>
 </div>
 {% endblock %}

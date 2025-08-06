@@ -2,61 +2,226 @@
 {% block title %}Student Dashboard{% endblock %}
 {% block head %}
 <style>
-.section-header {
-  font-size: 1.5em;
-  font-weight: 700;
-  color: #185a9d;
-  margin-bottom: 18px;
-}
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
-  gap: 26px;
-  margin: 28px 0 38px 0;
-}
-.zoom-box, .job-box {
-  background: #fff;
-  border-radius: 20px;
-  border: 4px solid;
-  border-image: linear-gradient(60deg, #43cea2, #185a9d) 1;
-  box-shadow: 0 4px 18px #3c80e022;
-  padding: 32px 18px 20px;
-  position: relative;
-  transition: transform .16s, box-shadow .17s;
-  cursor: pointer;
-}
-.zoom-box:hover, .job-box:hover {
-  transform: scale(1.045);
-  box-shadow: 0 12px 30px #3a7de622;
-  z-index: 2;
-}
-.app-title { font-size: 1.09em; font-weight: 600; margin-bottom: 5px; }
-.app-status {
-  font-size: 1em; margin-bottom: 8px; color: #1976d2; font-weight: 500;
-}
-.app-deadline { font-size: 0.95em; margin-bottom: 6px; color: #444bbb;}
-.app-feedback { color: #388e3c; font-size:0.95em;}
-.job-title { font-size: 1.08em; font-weight: 600; margin-bottom: 9px; color: #1565c0; }
-.job-desc { color: #455; font-size: 0.95em; margin-bottom: 10px; min-height:38px;}
-.btn-action, .apply-btn {
-  background: linear-gradient(90deg, #42a5f5, #1976d2);
-  color: #fff; font-weight: bold; padding:8px 21px;
-  border: none; border-radius: 22px; margin-top: 11px;
-  text-decoration: none; display: inline-block;
-  transition: background .2s, transform .19s;
-}
-.btn-action:hover, .apply-btn:hover { background: #43cea2; color: #165228;}
-.growth-card {
-  background: linear-gradient(90deg, #fafafa, #e3f2fd 90%);
-  border: 3px solid #6a11cb;
-  border-radius: 22px;
-  box-shadow: 0 2px 14px #5090e120;
-  text-align: center;
-  padding: 32px 18px;
-  margin-bottom: 32px;
-}
-.growth-card-title { font-size: 1.18em; font-weight: 700; color: #2575fc; margin-bottom: 7px;}
-.growth-card-desc { color: #555; margin-bottom: 14px;}
+  .section-header {
+    font-size: 1.6em;
+    font-weight: 800;
+    color: #1e3c72;
+    margin-bottom: 24px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 28px;
+    margin: 32px 0 40px 0;
+  }
+
+  .zoom-box, .job-box {
+    background: #ffffff;
+    border-radius: 22px;
+    border: 4px solid transparent;
+    border-image: linear-gradient(60deg, #3bb78f, #0bab64) 1;
+    box-shadow: 0 6px 20px rgba(59, 183, 143, 0.15);
+    padding: 36px 22px 24px;
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    cursor: pointer;
+    will-change: transform;
+  }
+
+  .zoom-box:hover, .job-box:hover {
+    transform: scale(1.06);
+    box-shadow: 0 16px 40px rgba(15, 138, 101, 0.3);
+    border-color: transparent;
+    z-index: 10;
+  }
+
+  .app-title {
+    font-size: 1.12em;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #0b7a75;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .app-status {
+    font-size: 1.03em;
+    margin-bottom: 8px;
+    color: #0d47a1;
+    font-weight: 600;
+  }
+
+  .app-deadline {
+    font-size: 0.97em;
+    margin-bottom: 8px;
+    color: #5b6dbd;
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  .app-feedback {
+    color: #2e7d32;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 6px;
+    letter-spacing: 0.015em;
+  }
+
+  .job-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #1565c0;
+    letter-spacing: 0.01em;
+  }
+
+  .job-desc {
+    color: #434c5e;
+    font-size: 1em;
+    margin-bottom: 14px;
+    min-height: 44px;
+    line-height: 1.4;
+    font-family: 'Roboto', sans-serif;
+  }
+
+  .btn-action, .apply-btn {
+    background: linear-gradient(90deg, #22c1c3, #0575e6);
+    color: #fff;
+    font-weight: 700;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 26px;
+    margin-top: 14px;
+    text-decoration: none;
+    display: inline-block;
+    box-shadow: 0 8px 20px rgba(5, 117, 230, 0.4);
+    transition: background 0.3s ease, transform 0.22s ease, box-shadow 0.3s ease;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .btn-action:hover, .apply-btn:hover {
+    background: linear-gradient(90deg, #0575e6, #22c1c3);
+    color: #e1f5fe;
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(5, 117, 230, 0.6);
+  }
+
+  .growth-card {
+    background: linear-gradient(90deg, #f9f9f9, #e1f5fe);
+    border: 3px solid #673ab7;
+    border-radius: 26px;
+    box-shadow: 0 4px 20px rgba(103, 58, 183, 0.15);
+    text-align: center;
+    padding: 36px 24px;
+    margin-bottom: 36px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+
+  .growth-card-title {
+    font-size: 1.22em;
+    font-weight: 800;
+    color: #5a8c14;
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  .growth-card-desc {
+    color: #666;
+    margin-bottom: 18px;
+    font-size: 1.02em;
+    line-height: 1.45;
+  }
+
+  /* --- Modal Styles (Updated) --- */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-content {
+    background: #fff;
+    padding: 2.5rem;
+    border-radius: 20px;
+    width: 90%;
+    height: 80vh; /* Takes up 80% of the viewport height */
+    max-width: 800px; /* A reasonable max-width */
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    position: relative;
+    transform: scale(0.9);
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    overflow-y: auto; /* Adds a scrollbar if content overflows vertically */
+  }
+
+  .modal-content.active {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .close-btn {
+    position: sticky; /* Keeps the close button visible while scrolling */
+    top: 0;
+    float: right;
+    background: none;
+    border: none;
+    font-size: 2.5rem;
+    color: #777;
+    cursor: pointer;
+    line-height: 1;
+    font-weight: 300;
+    transition: color 0.2s ease;
+    z-index: 1001;
+  }
+
+  .close-btn:hover {
+    color: #e74c3c;
+  }
+
+  .guidelines-header {
+    font-size: 2em;
+    color: #1e3c72;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .guidelines-content {
+    line-height: 1.5;
+    color: #333;
+    font-size: 1em;
+  }
+
+  .guidelines-content h5 {
+    color: #2c3e50;
+    font-size: 1.2em;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .guidelines-content ul {
+    list-style-type: disc;
+    padding-left: 2rem;
+  }
+
+  .guidelines-content li {
+    margin-bottom: 0.6rem;
+  }
+</style>
+
+<style>
+  /* Keep all your existing CSS styles here unchanged (as provided earlier) */
 </style>
 {% endblock %}
 
@@ -65,14 +230,19 @@
   <h1 class="text-center my-3" style="color:#2575fc; font-size:2em;">Welcome, {{ current_user.name }}!</h1>
   <div class="text-center mb-4">Manage Your Applications, Explore Jobs, and Grow 🚀</div>
 
-  <!-- 💡 Link to Growth Hub -->
-  <div class="growth-card">
-    <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Growth & Reflection Hub</div>
-    <div class="growth-card-desc">Complete 100 engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
-    <a href="{{ url_for('growth_menu') }}" class="btn-action">Go to Growth Hub</a>
+  <div class="dashboard-grid">
+    <div class="growth-card">
+      <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Growth & Reflection Hub</div>
+      <div class="growth-card-desc">Complete engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
+      <a href="{{ url_for('growth_menu') }}" class="btn-action">Go to Growth Hub</a>
+    </div>
+    <div class="growth-card">
+      <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Self Assessment</div>
+      <div class="growth-card-desc">Complete engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
+      <a href="{{ url_for('self_assessment_step', step=1) }}" class="btn-action">Start Self Assessment</a>
+    </div>
   </div>
 
-  <!-- 📄 Your Applications -->
   <div class="section-header">Your Active Applications</div>
   {% if apps %}
     <div class="dashboard-grid">
@@ -89,31 +259,28 @@
           </div>
           <div class="app-feedback">{{ app.teacher_feedback or 'No feedback yet.' }}</div>
 
-      {% if app.status in ["pending_resume", "corrections_needed"] %}
-  <form action="{{ url_for('upload', app_id=app._id) }}"
-        method="POST"
-        enctype="multipart/form-data"
-        class="d-flex flex-column">
-    <label class="form-label">Résumé File:</label>
-    <input type="file" name="resume" accept=".pdf,.doc,.docx" required class="form-control mb-2">
+          {% if app.status in ["pending_resume", "corrections_needed"] %}
+            <form action="{{ url_for('upload', app_id=app._id) }}"
+                  method="POST"
+                  enctype="multipart/form-data"
+                  class="d-flex flex-column">
+              <label class="form-label">Résumé File:</label>
+              <input type="file" name="resume" accept=".pdf,.doc,.docx" required class="form-control mb-2">
 
-    <label class="form-label">Photo File:</label>
-    <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
+              <label class="form-label">Photo File:</label>
+              <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
 
-    <button type="submit" class="btn btn-primary">
-      {% if app.status == 'corrections_needed' %} Re-upload {% else %} Upload {% endif %}
-    </button>
-  </form>
+              <button type="submit" class="btn btn-primary">
+                {% if app.status == 'corrections_needed' %} Re-upload {% else %} Upload {% endif %}
+              </button>
+            </form>
+          {% endif %}
 
-  {% if app.teacher_feedback %}
-    <div class="alert alert-info mt-2">
-      <strong>Teacher's Feedback:</strong> {{ app.teacher_feedback }}
-    </div>
-  {% endif %}
-{% endif %}
-
-
-    </div>
+          {% if app.teacher_feedback %}
+            <div class="alert alert-info mt-2">
+              <strong>Teacher's Feedback:</strong> {{ app.teacher_feedback }}
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -121,29 +288,133 @@
     <div class="text-center text-muted" style="font-size: 1.14em; padding: 19px; background: #eaf4fa; border-radius: 14px;">No active applications yet. Apply to a job below!</div>
   {% endif %}
 
-  <!-- 💼 Available Jobs -->
-  <div class="section-header">Available Jobs</div>
-  {% if jobs %}
-    <div class="dashboard-grid">
-      {% for job in jobs %}
-        <div class="job-box">
-          <div class="job-title">{{ job.title }}</div>
-          <div class="job-desc">{{ job.description[:140] }}{% if job.description|length > 140 %}...{% endif %}</div>
-          <div style="color:#43a047;margin-bottom:4px;">Vacancies: {{ job.vacancies }}</div>
-          {% if current_user.is_authenticated and current_user.role == 'student' and job._id not in applied_ids %}
-            <form action="{{ url_for('apply', job_id=job._id) }}" method="POST" onsubmit="return confirm('Apply for this job? You must upload your résumé and photo within 48 hours.');">
-              <button type="submit" class="apply-btn">Apply Now</button>
-            </form>
-          {% elif job._id in applied_ids %}
-            <span class="btn-action" style="background:#b2dfdb; color:#234; cursor:default;">Already Applied</span>
-          {% else %}
-            <span class="text-muted"><em>Login as student to apply</em></span>
-          {% endif %}
-        </div>
-      {% endfor %}
+  <!-- Redesigned Resume Guidelines Card -->
+  <div class="zoom-box text-center" id="viewGuidelinesBtn"
+     style="border-image: linear-gradient(60deg,#8e2de2, #4a00e0) 1;">
+  <i class="bi bi-journal-text display-4 mb-3 text-primary"></i>
+  <div class="app-title">View Resume Guidelines</div>
+  <div class="job-desc">Check out what makes a psychology résumé stand out — tailored guidance just for you!</div>
+</div>
+
+  </div>
+</div>
+
+<!-- Modal for Resume Guidelines -->
+<div id="guidelinesModal" class="modal-overlay">
+  <div class="modal-content">
+    <button class="close-btn" id="closeGuidelinesBtn">&times;</button>
+    <div class="guidelines-header">Psychology CV Guidelines</div>
+    <div class="guidelines-content">
+      <p>A well-crafted CV is your first impression. Follow these guidelines to create a professional and effective resume for psychology-related roles.</p>
+      
+      <h5>1. Contact Information</h5>
+      <ul>
+        <li>Include your full name, phone number, professional email, and LinkedIn profile link.</li>
+        <li>Ensure your email is professional (e.g., firstname.lastname@email.com).</li>
+      </ul>
+      
+      <h5>2. Education</h5>
+      <ul>
+        <li>List your degrees in reverse chronological order.</li>
+        <li>Include the name of the institution, degree earned, and graduation date.</li>
+        <li>Mention any relevant coursework, honors, or research projects.</li>
+      </ul>
+      
+      <h5>3. Research and Clinical Experience</h5>
+      <ul>
+        <li>This is crucial for psychology roles. Detail your experience with bullet points.</li>
+        <li>Use action verbs to describe your responsibilities and achievements (e.g., "Assisted with," "Conducted," "Analyzed").</li>
+        <li>Quantify your achievements whenever possible (e.g., "Analyzed data from 50+ participants," "Administered 10 psychological assessments").</li>
+      </ul>
+      
+      <h5>4. Skills</h5>
+      <ul>
+        <li>Categorize your skills into sections like "Technical Skills" (e.g., SPSS, R, Microsoft Office), "Language Skills," and "Interpersonal Skills."</li>
+        <li>Be specific and honest about your proficiency level.</li>
+      </ul>
+      
+      <h5>5. Volunteer Work and Extracurricular Activities</h5>
+      <ul>
+        <li>Include any relevant volunteer or club work that demonstrates your passion, leadership, or teamwork skills.</li>
+      </ul>
     </div>
-  {% else %}
-    <div class="text-center my-4"><p class="lead text-muted">No jobs available at the moment. Please check back soon!</p></div>
-  {% endif %}
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById("guidelinesModal");
+  const btn = document.getElementById("viewGuidelinesBtn");
+  const closeBtn = document.getElementById("closeGuidelinesBtn");
+  const modalContent = document.querySelector(".modal-content");
+
+  btn.onclick = function() {
+    modal.style.display = "flex";
+    setTimeout(() => {
+      modalContent.classList.add('active');
+    }, 10);
+  }
+
+  closeBtn.onclick = function() {
+    modalContent.classList.remove('active');
+    setTimeout(() => {
+      modal.style.display = "none";
+    }, 300);
+  }
+
+  window.onclick = function(event) {
+    if (event.target == modal) {
+      modalContent.classList.remove('active');
+      setTimeout(() => {
+        modal.style.display = "none";
+      }, 300);
+    }
+  }
+</script>
+
+<div class="section-header">Available Jobs</div>
+{% if jobs %}
+  <div class="dashboard-grid">
+  
+   {% for job in jobs %}
+  <div class="job-box">
+    <!-- Title as clickable -->
+    <div class="job-title">
+      <a href="{{ url_for('job_detail', job_id=job._id) }}" style="text-decoration: none; color: #3f51b5;">
+        {{ job.title }}
+      </a>
+    </div>
+
+    <!-- Preview -->
+    <div class="job-desc">
+      {{ job.job_description[:140] }}{% if job.job_description|length > 140 %}...{% endif %}
+    </div>
+
+    <div class="text-success mb-2">Vacancies: {{ job.vacancies }}</div>
+
+    <!-- Application Logic -->
+    {% if current_user.is_authenticated and current_user.role == 'student' %}
+      {% if job._id in applied_ids %}
+        <span class="btn-action" style="background:#b2dfdb; color:#234;">Already Applied</span>
+      {% elif has_active %}
+        <span class="text-muted"><em>You already applied for a job.</em></span>
+      {% elif job.vacancies <= 0 %}
+        <span class="text-danger">No vacancies left</span>
+      {% else %}
+        <form action="{{ url_for('apply', job_id=job._id) }}" method="POST"
+              onsubmit="return confirm('Apply for this job? You must upload your résumé and photo within 48 hours.')">
+          <button type="submit" class="apply-btn">Apply Now</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <span class="text-muted"><em>Login as student to apply</em></span>
+    {% endif %}
+
+  </div>
+{% endfor %}
+
+
+{% else %}
+  <div class="text-center my-4"><p class="lead text-muted">No jobs available at the moment. Please check back soon!</p></div>
+{% endif %}
 </div>
 {% endblock %}

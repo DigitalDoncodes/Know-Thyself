@@ -44,11 +44,13 @@ class EditProfileForm(FlaskForm):
 
 class JobForm(FlaskForm):
     """Form to create or edit a job"""
-    title       = StringField("Job Title", validators=[DataRequired()])
-    description = TextAreaField("Description", validators=[DataRequired()])
-    vacancies   = IntegerField("Vacancies", validators=[DataRequired()])
-    pof         = FileField("PoF (PDF)")
-    submit      = SubmitField("Save")
+    title             = StringField("Job Title", validators=[DataRequired()])
+    # ✅ New fields added to the form
+    job_description   = TextAreaField("Job Description", validators=[DataRequired()])
+    job_specification = TextAreaField("Job Specification", validators=[DataRequired()])
+    vacancies         = IntegerField("Vacancies", validators=[DataRequired()])
+    pof               = FileField("PoF (PDF)")
+    submit            = SubmitField("Save")
 
 # New form for self-assessment
 class SelfAssessmentForm(FlaskForm):

@@ -1,9 +1,43 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }}{% endblock %}
+
 {% block content %}
-<h2>{{ job.title }}</h2>
-<p>{{ job.description }}</p>
-{% if job.pof_filename %}
-  <p><a href="{{ url_for('download', filename=job.pof_filename) }}">Download PoF</a></p>
-{% endif %}
+<div class="bg-gray-100 py-12 sm:py-16">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 sm:p-12">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
+          {{ job.title }}
+        </h1>
+        <p class="mt-2 text-lg text-gray-500 max-w-2xl mx-auto">
+          <span class="bg-indigo-100 text-indigo-800 text-sm font-semibold px-3 py-1 rounded-full">{{ job.status or "Open" }}</span>
+        </p>
+      </div>
+
+      <div class="space-y-8">
+        <!-- Job Specification Section -->
+        {% if job.job_specification %}
+        <div>
+          <h2 class="text-3xl font-bold text-gray-800 border-b-2 border-indigo-200 pb-2">Job Specification</h2>
+          <p class="mt-4 text-lg text-gray-600 leading-relaxed">{{ job.job_specification }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Job Description Section -->
+        {% if job.job_description %}
+        <div>
+          <h2 class="text-3xl font-bold text-gray-800 border-b-2 border-indigo-200 pb-2">Job Description</h2>
+          <p class="mt-4 text-lg text-gray-600 leading-relaxed">{{ job.job_description }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="mt-12 text-center">
+        <a href="{{ url_for('job_list') }}" class="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150 ease-in-out">
+          ← Back to Jobs
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

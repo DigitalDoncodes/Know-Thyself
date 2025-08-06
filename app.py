@@ -13,21 +13,49 @@ from bson.objectid import ObjectId
 from werkzeug.utils import secure_filename
 from flask import (
     Flask, render_template, redirect, url_for, request,
-    flash, send_from_directory, send_file, session, abort
+    flash, send_from_directory, send_file, session, abort, current_app
 )
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_mail import Message
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from db import mongo, mail, login_manager, scheduler, IST, User, init_extensions
+from db import mongo, login_manager, scheduler, IST, User, init_extensions
 from schemas import LoginForm, RegisterForm, JobForm, EditProfileForm, hash_pw, check_pw, SelfAssessmentForm
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config['MAX_CONTENT_LENGTH'] = 7 * 1024 * 1024  # 7 MB (covers both files in 1 upload)
+# Import SMTP functions from the new smtp.py file
+import smtp
 
+# Initialize Flask app
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# Configure your SMTP settings
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = ('Psychology Job Portal', 'no-reply@psychportal.com')
+
+# Set UPLOAD_FOLDER and MAX_CONTENT_LENGTH from environment variables
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 7 * 1024 * 1024))
+
+# Initialize Flask extensions
 init_extensions(app)
+
+# Initialize Flask-Mail and set it in the smtp module for cross-module usage
+mail_instance = smtp.init_mail_app(app)
+smtp.set_mail_instance(mail_instance)
+
+# Load MongoDB URI from environment variables
+app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+
+# Enable Flask-Mail Debugging for detailed output
+app.config['MAIL_DEBUG'] = True
+
 
 def teacher_required(f):
     """Decorator to restrict access to teachers only."""
@@ -36,13 +64,13 @@ def teacher_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role != "teacher":
             flash("You must be a teacher to access this page.", "warning")
-            return redirect(url_for("startpage")) 
+            return redirect(url_for("startpage"))
         return f(*args, **kwargs)
     return decorated_function
 
 
 def generate_growth_modules():
-   
+    """Generates a list of growth activity modules for the Growth Hub."""
     titles = [
         "How are you feeling emotionally today?",
         "Describe one positive thing that happened today.",
@@ -103,37 +131,6 @@ def generate_growth_modules():
         modules.append({"title": title, "html": html})
     return modules
 
-from flask_mail import Message
-from flask import render_template, current_app
-from datetime import datetime
-import pytz
-
-
-def send_confirmation_mail(applicant_email, applicant_name, application_id, job_title):
-    """Send confirmation email to the student."""
-    ist = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(ist)
-
-    msg = Message(
-        subject="✅ Application Received – Résumé & Photo",
-        sender=current_app.config["MAIL_USERNAME"],
-        recipients=[applicant_email],
-    )
-
-    msg.html = render_template(
-        "confirmation_mail.html",
-        name=applicant_name,
-        job_title=job_title,
-        application_id=application_id,
-        submitted_date=now.strftime("%B %d, %Y – %I:%M %p IST")
-    )
-
-    try:
-        mail.send(msg)
-        print(f"✅ Confirmation email sent to {applicant_email}")
-    except Exception as e:
-        print(f"❌ Error sending confirmation email: {e}")
-
 def cleanup_deadlines():
     """Mark applications with expired upload window as rejected_auto"""
     now_utc = datetime.now(timezone.utc)
@@ -152,41 +149,11 @@ def generate_otp():
     """Generate a 6-digit OTP"""
     return str(random.randint(100000, 999999))
 
-def send_otp_email(to_email, otp):
-    """Send OTP email for password change verification"""
-    msg = Message(
-        subject='Your OTP for Password Change',
-        sender=app.config["MAIL_USERNAME"],
-        recipients=[to_email]
-    )
-    msg.body = f"Your OTP to change your password is: {otp}\nIf you did not request this, ignore this email."
-    mail.send(msg)
-
-def send_resume_and_photo_mail(resume_filename, photo_filename, applicant_email, job_title):
-    msg = Message(
-        subject=f"New Résumé & Photo for '{job_title}'",
-        sender=app.config["MAIL_USERNAME"],
-        recipients=[os.getenv("NOTICE_MAILBOX")]
-    )
-    msg.body = (
-        f"Student {current_user.name or current_user.email} has uploaded a résumé and photo for job '{job_title}'."
-    )
-
-    resume_path = os.path.join(app.config["UPLOAD_FOLDER"], resume_filename)
-    photo_path = os.path.join(app.config["UPLOAD_FOLDER"], photo_filename)
-
-    with app.open_resource(resume_path) as rf:
-        msg.attach(resume_filename, "application/octet-stream", rf.read())
-    with app.open_resource(photo_path) as pf:
-        msg.attach(photo_filename, "application/octet-stream", pf.read())
-
-    mail.send(msg)
 
 # ---------- Routes ----------
 
 @app.route("/")
 def startpage():
-    if current_user.is_authenticated:
      return render_template("startpage.html")
 
 # Top of app.py or a separate file (growth_config.py)
@@ -288,7 +255,7 @@ GROWTH_ACTIVITIES = [
     {"id": 95, "title": "Share a Short Story", "desc": "Write a mini story about a real or imagined event.", "icon": "📘"},
     {"id": 96, "title": "Daily Intention", "desc": "What’s your main intention for tomorrow?", "icon": "📅"},
     {"id": 97, "title": "Your Best Trait", "desc": "What personal trait are you proudest of?", "icon": "💖"},
-    {"id": 98, "title": "Five Minutes of Silence", "desc": "Sit in silence and write your first thought after.", "icon": "🤫"},
+    {"id": 98, "desc": "Sit in silence and write your first thought after.", "icon": "🤫"},
     {"id": 99, "title": "Shoutout Someone", "desc": "Give a shoutout to a peer or teacher.", "icon": "📣"},
     {"id": 100, "title": "Virtual Garden", "desc": "Imagine growing a quality (like resilience or kindness). Write how you’ll nurture it!", "icon": "🌿"},
 ]
@@ -445,6 +412,16 @@ def job_list():
 
     return render_template("job_list.html", jobs=jobs, applied_ids=applied_ids)
 
+@app.route('/job/<job_id>')
+def job_detail(job_id):
+    job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        flash("Job not found", "danger")
+        return redirect(url_for('student_dashboard'))
+    return render_template("job_detail.html", job=job)
+
+
+
 @app.route('/resources')
 def resources():
     return render_template('resources.html')
@@ -453,12 +430,6 @@ def resources():
 def advice():
     return render_template("advice.html")
 
-from flask import request, redirect, url_for, flash, current_app, render_template
-from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
-from bson.objectid import ObjectId
-from datetime import datetime
-import os
 @app.route("/upload_resume/<job_id>", methods=["POST"])
 @login_required
 def upload_resume(job_id):
@@ -497,8 +468,7 @@ def upload_resume(job_id):
 
     mongo.db.applications.update_one(
         {"_id": application["_id"]},
-        {
-            "$set": {
+        {"$set": {
                 "status": "submitted",
                 "resume_uploaded_at": datetime.utcnow(),
                 "resume_filename": filename_resume,
@@ -511,10 +481,11 @@ def upload_resume(job_id):
     job_title = job.get("title", "Untitled Job")
 
     try:
-        send_confirmation_mail(current_user.email, current_user.name, application["_id"], job_title)
+        smtp.send_confirmation_mail(current_user.email, current_user.name, application["_id"], job_title)
         flash("✅ Resume submitted and confirmation email sent.", "success")
-    except:
+    except Exception as e: # Catch specific exception for better debugging
         flash("Resume saved, but email failed to send.", "warning")
+        print(f"Error sending confirmation email: {e}") # Log the error
 
     return redirect(url_for("student_dashboard"))
 
@@ -544,7 +515,12 @@ def student_dashboard():
 
     jobs = list(mongo.db.jobs.find({"status": "open"}).sort("created_at", -1))
 
-    applied_ids = {app["job_id"] for app in apps}
+    applied_ids = set()
+    if current_user.is_authenticated and current_user.role == 'student':
+        student_applications = mongo.db.applications.find({"user_id": ObjectId(current_user.id)})
+        applied_ids = {app["job_id"] for app in student_applications}
+
+
     has_active_application = any(
         app.get("status") in ("pending_resume", "submitted", "approved") for app in apps
     )
@@ -575,23 +551,6 @@ def student_dashboard():
         has_active=has_active_application,
         now=now_ist
     )
-
-def send_admin_notification(student_name, job_title, student_email):
-    msg = Message(
-        subject=f"📥 New Application Submitted: {job_title}",
-        sender=current_app.config["MAIL_USERNAME"],
-        recipients=["admin@example.com"]  # ✅ Replace with your admin email
-    )
-    msg.body = f"""A new job application has been submitted.
-
-Student Name: {student_name}
-Student Email: {student_email}
-Job Title: {job_title}
-Submitted At: {datetime.now().strftime('%d %b %Y, %I:%M %p')}
-
-Check the admin panel to review it.
-"""
-    mail.send(msg)
 
 @app.route("/apply/<job_id>", methods=["POST"])
 @login_required
@@ -648,20 +607,7 @@ def apply(job_id):
 
     flash("Application successful! Please upload your résumé within 48 hours.", "success")
     return redirect(url_for("student_dashboard"))
-  # --- SEND BOTH FILES AS EMAIL ATTACHMENTS ---
-  
-    job = mongo.db.jobs.find_one({"_id": app_doc['job_id']})
-    job_title = job.get('title', 'Unknown Job')
-    send_resume_and_photo_mail(resume_filename, photo_filename, current_user.email, job_title)
-    
-    flash("Résumé and photo uploaded and emailed successfully!", "success")
-    return redirect(url_for("student_dashboard"))
-from flask import request, redirect, url_for, flash, current_app
-from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
-from bson.objectid import ObjectId
-from datetime import datetime, timezone
-import os
+
 
 @app.route("/upload/<app_id>", methods=["POST"])
 @login_required
@@ -716,8 +662,7 @@ def upload(app_id):
     # 📌 6. Update application in DB
     mongo.db.applications.update_one(
         {"_id": ObjectId(app_id)},
-        {
-            "$set": {
+        {"$set": {
                 "resume_filename": resume_filename,
                 "photo_filename": photo_filename,
                 "resume_uploaded_at": datetime.now(timezone.utc),
@@ -733,7 +678,7 @@ def upload(app_id):
 
     # 📨 Send résumé & photo as attachments to admin
     try:
-        send_resume_and_photo_mail(
+        smtp.send_resume_and_photo_mail(
             resume_filename, photo_filename,
             current_user.email, job_title
         )
@@ -743,7 +688,7 @@ def upload(app_id):
 
     # ✅ Send confirmation email to student
     try:
-        send_confirmation_mail(
+        smtp.send_confirmation_mail(
             applicant_email=current_user.email,
             applicant_name=current_user.name,
             application_id=str(app_doc["_id"]),
@@ -756,20 +701,7 @@ def upload(app_id):
         
     return redirect(url_for("student_dashboard"))
 
-app.route("/resume/reupload/<app_id>", methods=["POST"])
-@login_required
-def resume_reupload(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-
-    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
-        flash("Unauthorized re-upload attempt.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    if app_doc["status"] != "corrections_needed":
-        flash("You can only re-upload when corrections are requested.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
+# Moved handle_resume_submission outside of the route
 def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True):
     resume = request.files.get("resume")
     photo = request.files.get("photo")
@@ -785,9 +717,11 @@ def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=Tru
     resume_filename = secure_filename(f"{base}{ext_resume}")
     photo_filename = secure_filename(f"{base}_photo{ext_photo}")
 
-    resume_path = os.path.join(app.config["UPLOAD_FOLDER"], resume_filename)
-    photo_path = os.path.join(app.config["UPLOAD_FOLDER"], photo_filename)
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    upload_dir = app.config.get("UPLOAD_FOLDER", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    resume_path = os.path.join(upload_dir, resume_filename)
+    photo_path = os.path.join(upload_dir, photo_filename)
+    
     resume.save(resume_path)
     photo.save(photo_path)
 
@@ -809,7 +743,7 @@ def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=Tru
     job_title = job.get("title", "Job")
 
     try:
-        send_confirmation_mail(
+        smtp.send_confirmation_mail(
             applicant_email=current_user.email,
             applicant_name=current_user.name,
             application_id=str(app_doc["_id"]),
@@ -821,11 +755,26 @@ def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=Tru
         flash("Upload succeeded, but email failed.", "warning")
 
     try:
-        send_admin_notification(current_user.name, job_title, current_user.email)
+        smtp.send_admin_notification(current_user.name, job_title, current_user.email)
     except Exception as e:
         print("Admin email error:", e)
 
     return redirect(url_for("student_dashboard"))
+
+@app.route("/resume/reupload/<app_id>", methods=["POST"])
+@login_required
+def resume_reupload(app_id):
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+
+    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
+        flash("Unauthorized re-upload attempt.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    if app_doc["status"] != "corrections_needed":
+        flash("You can only re-upload when corrections are requested.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
  
 
 # --- Teacher Routes ---
@@ -857,6 +806,13 @@ def teacher_dashboard():
             {"$match": {"status": "pending_resume"}},
             {"$sort": {"applied_at": -1}},
             {"$limit": 8},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$unwind": "$user"},
             {"$lookup": {
                 "from": "jobs",
                 "localField": "job_id",
@@ -903,23 +859,6 @@ def teacher_dashboard():
         growth_stats=growth_stats      # ✅ Per-student completion counts
     )
 
-@app.route("/update_application/<app_id>", methods=["POST"])
-@teacher_required
-def update_application(app_id):
-    status = request.form.get("status")
-    feedback = request.form.get("feedback")
-    feedback = feedback.strip() if feedback else ""
-
-    if status not in {"approved", "rejected", "corrections_needed"}:
-        flash("Invalid status.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": {"status": status, "teacher_feedback": feedback}}
-    )
-    flash("Application updated.", "success")
-    return redirect(url_for("teacher_dashboard"))
 
 @app.route("/select_job_to_delete")
 @teacher_required
@@ -966,7 +905,8 @@ def new_job():
             form.pof.data.save(os.path.join(app.config["UPLOAD_FOLDER"], pof_name))
         mongo.db.jobs.insert_one({
             "title": form.title.data,
-            "description": form.description.data,
+            "job_description": form.job_description.data,
+            "job_specification": form.job_specification.data,
             "vacancies": form.vacancies.data,
             "pof_filename": pof_name,
             "created_by": ObjectId(current_user.id),
@@ -978,41 +918,61 @@ def new_job():
     return render_template("job_form.html", form=form)
 
 
+from flask import render_template, redirect, url_for, flash, request
+from flask_login import current_user, login_required
+from bson.objectid import ObjectId
+from werkzeug.utils import secure_filename
+import os
+
 @app.route("/job/edit/<job_id>", methods=["GET", "POST"])
-@teacher_required
+@login_required
 def edit_job(job_id):
-    """Page to edit an existing job"""
+    # Only teachers allowed
+    if current_user.role != "teacher":
+        return redirect(url_for("index"))
+
+    # Fetch the job from the database
     job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
     if not job:
         flash("Job not found.", "danger")
         return redirect(url_for("teacher_dashboard"))
 
+    # Instantiate the form and pre-populate with job data on GET
     form = JobForm()
     if request.method == "GET":
         form.title.data = job.get("title", "")
-        form.description.data = job.get("description", "")
+        # Correctly pre-populating the new fields in the form
+        form.job_description.data = job.get("job_description", "")
+        form.job_specification.data = job.get("job_specification", "")
         form.vacancies.data = job.get("vacancies", 6)
-
+        # Assuming the JobForm has a pof field, pre-populate if needed
+        # form.pof.data = job.get("pof_filename", "")
+    
+    # If the form is submitted and passes validation
     if form.validate_on_submit():
+        # Handle PoF file upload if present
+        pof_name = job.get("pof_filename")
         if form.pof.data and form.pof.data.filename:
             pof_name = secure_filename(form.pof.data.filename)
-            form.pof.data.save(os.path.join(app.config["UPLOAD_FOLDER"], pof_name))
-        else:
-            pof_name = job.get("pof_filename")
-
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], pof_name)
+            form.pof.data.save(save_path)
+        
+        # Update job in MongoDB with all fields
         mongo.db.jobs.update_one(
             {"_id": ObjectId(job_id)},
             {"$set": {
                 "title": form.title.data,
-                "description": form.description.data,
+                # Correctly using the form object to get the new fields
+                "job_description": form.job_description.data,
+                "job_specification": form.job_specification.data,
                 "vacancies": form.vacancies.data,
                 "pof_filename": pof_name,
             }}
         )
-        flash("Job updated", "success")
+        flash("Job updated successfully.", "success")
         return redirect(url_for("teacher_dashboard"))
-
-    return render_template("job_form.html", form=form)
+        
+    return render_template("edit_job.html", form=form, job=job)
 
 
 @app.route("/job/delete/<job_id>", methods=["POST"])
@@ -1049,48 +1009,12 @@ def delete_jobs_list():
 
 
 # --- Application Status Updates by Teacher ---
-@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+
+
+
+@app.route("/teacher/clear_application")
 @teacher_required
-def update_application_status(app_id):
-    status = request.form.get("status")
-    feedback = request.form.get("feedback")
-    feedback = feedback.strip() if feedback else ""
-
-    if status not in {"approved", "rejected", "corrections_needed"}:
-        flash("Invalid status.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": {"status": status, "teacher_feedback": feedback}}
-    )
-    flash("Application updated.", "success")
-    return redirect(url_for("teacher_dashboard"))
-
-
-@app.route('/teacher/application/clear/<app_id>', methods=['POST'])
-@teacher_required
-def clear_application(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc:
-        flash('Application not found.', 'warning')
-        return redirect(url_for('teacher_dashboard'))
-    
-    job_id = app_doc['job_id']
-    mongo.db.applications.delete_one({"_id": ObjectId(app_id)})
-
-    mongo.db.jobs.update_one(
-        {"_id": job_id},
-        {"$inc": {"vacancies": 1}}
-    )
-
-    flash('Application cleared and vacancy updated.', 'success')
-    return redirect(url_for('teacher_dashboard'))
-
-
-@app.route("/teacher/clear_applications")
-@teacher_required
-def clear_applications():
+def clear_application():
     name_filter = request.args.get("name", "").strip()
     status_filter = request.args.get("status", "").strip()
     resume_filter = request.args.get("resume", "").strip()
@@ -1125,7 +1049,7 @@ def clear_applications():
     ]
 
     return render_template(
-        "clear_applications.html",
+        "clear_application.html",
         applications=applications,
         name_filter=name_filter,
         status_filter=status_filter,
@@ -1134,13 +1058,13 @@ def clear_applications():
         resume_options=resume_options
     )
 
-@app.route('/teacher/clear_applications_bulk', methods=['POST'])
+@app.route('/teacher/clear_application_bulk', methods=['POST'])
 @teacher_required
-def clear_applications_bulk():
+def clear_application_bulk():
     app_ids = request.form.getlist('app_ids')
     if not app_ids:
         flash('No applications selected.', 'warning')
-        return redirect(url_for('clear_applications'))
+        return redirect(url_for('clear_application'))
 
     object_ids = [ObjectId(app_id) for app_id in app_ids]
 
@@ -1159,7 +1083,7 @@ def clear_applications_bulk():
         )
 
     flash(f'{result.deleted_count} application(s) cleared and vacancies updated.', 'success')
-    return redirect(url_for('clear_applications'))
+    return redirect(url_for('clear_application'))
  
 @app.route("/teacher/assess", methods=["GET", "POST"])
 @teacher_required
@@ -1169,7 +1093,7 @@ def assess_students():
         new_status = request.form.get("status")
         feedback = request.form.get("feedback", "").strip()
 
-        if app_id and new_status in {"approved", "rejected", "corrections_needed"}:
+        if app_id and new_status in {"approved", "rejected", "needs_corrections"}:
             mongo.db.applications.update_one(
                 {"_id": ObjectId(app_id)},
                 {"$set": {"status": new_status, "teacher_feedback": feedback}}
@@ -1242,6 +1166,17 @@ def assess_students():
         statuses=all_statuses,
         resume_options=resume_options,
     )
+
+@app.route('/teacher/delete_student_reflection/<reflection_id>', methods=["POST"])
+@teacher_required
+def delete_student_reflection(reflection_id):
+    try:
+        mongo.db.self_assessments.delete_one({"_id": ObjectId(reflection_id)})
+        flash("✅ Reflection successfully deleted.", "success")
+    except Exception as e:
+        flash("❌ Failed to delete reflection.", "danger")
+        print(f"Delete error: {e}")
+    return redirect(url_for('view_student_reflections'))
 
 @app.route("/teacher/registered_students")
 @teacher_required
@@ -1438,7 +1373,7 @@ def edit_profile():
                     "password": form.password.data,
                 }
                 session['otp_code'] = otp
-                send_otp_email(form.email.data.lower(), otp)
+                smtp.send_otp_email(form.email.data.lower(), otp)
                 flash("OTP sent to your email for password change.", "info")
                 return render_template("otp_verify.html")
 
@@ -1470,36 +1405,88 @@ def edit_profile():
     return render_template("otp_verify.html")
 
 # --- Student Self-Assessment Routes ---
-@app.route('/student/self_assessment', methods=['GET', 'POST'])
+
+@app.route('/student/self_assessment')
 @login_required
-def self_assessment():
+def self_assessment_start():
+    """Initial route to start the self-assessment."""
+    if current_user.role != 'student':
+        flash("You are not authorized to access this page.", "danger")
+        return redirect(url_for('teacher_dashboard'))
+    return redirect(url_for('self_assessment_step', step=1))
+
+
+@app.route('/student/self_assessment/<int:step>', methods=['GET', 'POST'])
+@login_required
+def self_assessment_step(step):
+    """Multi-step route for the self-assessment."""
     if current_user.role != 'student':
         flash("You are not authorized to access this page.", "danger")
         return redirect(url_for('teacher_dashboard'))
 
     form = SelfAssessmentForm()
-    if form.validate_on_submit():
-        try:
-            # Store student's name and all question answers in MongoDB
-            assessment_data = {
-                'student_id': current_user.student_id,
-                'student_name': current_user.name,
-                'submission_date': datetime.now(timezone.utc),
-                'q1_answer': form.q1.data,
-                'q2_answer': form.q2.data,
-                'q3_answer': form.q3.data,
-                'q4_answer': form.q4.data,
-                'q5_answer': form.q5.data,
-            }
-            mongo.db.self_assessments.insert_one(assessment_data)
-            flash("Your self-assessment has been recorded. Thank you!", "success")
-            return redirect(url_for('student_dashboard'))
-        except Exception as e:
-            print(f"Error saving self-assessment: {e}")
-            flash("An error occurred while submitting your answers. Please try again.", "danger")
     
-    return render_template('self_assessment.html', form=form)
+    # Define which questions belong to each step
+    step_map = {
+        1: ['q1', 'q2'],
+        2: ['q3', 'q4'],
+        3: ['q5']
+    }
 
+    if step not in step_map:
+        abort(404)
+
+    if request.method == 'POST':
+        # Check if the submitted data is for the current step
+        all_present = True
+        for q in step_map[step]:
+            if not getattr(form, q).data:
+                all_present = False
+                break
+
+        if all_present:
+            # Store data from the current step in the session
+            for q in step_map[step]:
+                session[q] = getattr(form, q).data
+            
+            # Check if there is a next step
+            if step < len(step_map):
+                return redirect(url_for('self_assessment_step', step=step + 1))
+            else:
+                # Final step: combine all data and save to DB
+                try:
+                    assessment_data = {
+                        'student_id': current_user.student_id,
+                        'student_name': current_user.name,
+                        'submission_date': datetime.now(timezone.utc),
+                        'q1_answer': session.get('q1'),
+                        'q2_answer': session.get('q2'),
+                        'q3_answer': session.get('q3'),
+                        'q4_answer': session.get('q4'),
+                        'q5_answer': session.get('q5'),
+                    }
+                    mongo.db.self_assessments.insert_one(assessment_data)
+
+                    # Clear session data
+                    for q in step_map:
+                        for field in step_map[q]:
+                            session.pop(field, None)
+
+                    flash("Your self-assessment has been recorded. Thank you!", "success")
+                    return redirect(url_for('student_dashboard'))
+                except Exception as e:
+                    print(f"Error saving self-assessment: {e}")
+                    flash("An error occurred while submitting your answers. Please try again.", "danger")
+        else:
+            flash("Please fill out all the fields.", "warning")
+    
+    # Handle GET request and re-render on validation failure
+    if step == 1:
+        return render_template('self_assessment_part1.html', form=form, step=step)
+    elif step == 2:
+        return render_template('self_assessment_part2.html', form=form, step=step)
+    elif step == 3:
+        return render_template('self_assessment_part3.html', form=form, step=step)
 
 # --- Teacher Route to View Self-Assessment Answers ---
 @app.route('/teacher/student_reflections')
@@ -1507,6 +1494,7 @@ def self_assessment():
 def view_student_reflections():
     reflections = list(mongo.db.self_assessments.find({}).sort("submission_date", -1))
     return render_template('student_reflections.html', reflections=reflections)
+
 # ---------- Teacher's Applied and Registered Students ----------
 @app.route("/teacher/applied_students")
 @teacher_required
@@ -1562,6 +1550,10 @@ def contact():
 def about():
     return render_template("about.html")
 
+@app.route("/creator")
+def creator():
+    return render_template("creator.html")
+
 from flask import request, jsonify
 
 DOG_RESPONSES = [
@@ -1587,6 +1579,53 @@ def virtual_pet_dog_chat():
         "If you need advice, just ask. I'm a very good dog."
     ]
     return jsonify({"reply": random.choice(replies)})
+
+@app.route('/teacher/update_application/<application_id>', methods=['POST'])
+@login_required
+def update_application_status(application_id):
+    status = request.form.get('status')
+    feedback = request.form.get('feedback', "").strip()
+
+    print(f"DEBUG (app.py route): update_application_status called for app_id: {application_id}")
+    print(f"DEBUG (app.py route): Status received: {status}, Feedback: {feedback}")
+
+    if status not in ["approved", "rejected", "needs_corrections"]:
+        flash("Invalid application status submitted.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    application = mongo.db.applications.find_one({"_id": ObjectId(application_id)})
+    if not application:
+        flash("Application not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    student = mongo.db.users.find_one({"_id": ObjectId(application["user_id"])})
+    job = mongo.db.jobs.find_one({"_id": ObjectId(application["job_id"])})
+
+    print(f"DEBUG (app.py route): Found student: {student['email']}, job: {job['title']}")
+
+    # Update application in database
+    mongo.db.applications.update_one(
+        {"_id": ObjectId(application_id)},
+        {"$set": {
+            "status": status,
+            "teacher_feedback": feedback,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    print(f"DEBUG (app.py route): Database updated for application {application_id}")
+
+    # Send notification email
+    smtp.send_application_status_email(
+        student_email=student["email"],
+        student_name=student.get("name", "Student"),
+        status=status,
+        job_title=job.get("title", "Your Job Application"),
+        feedback=feedback if status == "needs_corrections" else None
+    )
+    print(f"DEBUG (app.py route): smtp.send_application_status_email called.")
+
+    flash("✅ Application updated and student notified.", "success")
+    return redirect(url_for("teacher_dashboard"))
 
 
 if __name__ == '__main__':

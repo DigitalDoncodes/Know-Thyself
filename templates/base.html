@@ -1,79 +1,234 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full bg-gray-100">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Know-Thyself Job Portal{% endblock %}</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
-  <!-- Custom Styles -->
+  <title>{% block title %}Know-Thyself{% endblock %}</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Inter Font -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; background: #f8f9fa; }
-    .navbar { background: linear-gradient(45deg, #6a11cb, #2575fc); }
-    .navbar-brand { font-weight: bold; color: white !important; }
-    .nav-link { color: white !important; }
-    .nav-link:hover { color: #ffd !important; }
-    footer { background: #343a40; color: white; padding: 20px 0; text-align: center; margin-top: 40px; }
+    body { font-family: 'Inter', sans-serif; }
+    /* Dynamic, wave-like animated background for the header */
+    .animated-header-bg {
+      position: relative;
+      background: linear-gradient(135deg, #1f2937, #153e5e);
+    }
+    .animated-header-bg::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 15% 50%, #2e4465, transparent 60%),
+                    radial-gradient(circle at 85% 50%, #4a5568, transparent 60%);
+        animation: psy-waves 40s ease-in-out infinite alternate;
+        opacity: 0.8;
+    }
+    @keyframes psy-waves {
+        0% { transform: scale(1) translate(0, 0); }
+        100% { transform: scale(1.5) translate(-10%, 10%); }
+    }
+
+    /* Unique text animations for navigation links on hover */
+    .animated-link {
+        display: inline-block;
+        transition: transform 0.3s, color 0.3s;
+        transform-style: preserve-3d;
+        perspective: 1000px;
+        position: relative;
+    }
+    .animated-link .char {
+        display: inline-block;
+        transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    }
+    .animated-link:hover .char {
+        transform: translateY(-5px);
+        color: #fff;
+    }
+    .animated-link:hover .char:nth-child(even) {
+        transform: translateY(5px);
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body>
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="{{ url_for('startpage') }}">Know-Thyself</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('job_list') }}">Jobs</a></li>
+<body class="h-full">
+
+  <!-- Main Content Wrapper -->
+  <div class="min-h-full flex flex-col">
+
+    <!-- Navigation Header -->
+    <header class="animated-header-bg shadow-xl">
+      <nav class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <!-- Logo and Brand Name -->
+            <a href="{{ url_for('startpage') }}" class="flex-shrink-0 flex items-center space-x-2 text-white transition-transform transform hover:scale-110 duration-300 ease-in-out">
+              <img src="https://res.cloudinary.com/ddqeqxamf/image/upload/v1754506544/psychology_logo_dqa0hs.jpg" alt="Know-Thyself Logo" class="h-10 w-auto rounded-lg">
+              <span class="text-xl font-bold tracking-tight">Know-Thyself</span>
+            </a>
+            
+            <!-- Main Navigation Links -->
+            <div class="hidden md:flex items-center space-x-4">
+              <a href="{{ url_for('job_list') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Jobs</a>
+              {% if current_user.is_authenticated %}
+                {% if current_user.role == 'student' %}
+                  <a href="{{ url_for('student_dashboard') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Dashboard</a>
+                {% elif current_user.role == 'teacher' %}
+                  <a href="{{ url_for('teacher_dashboard') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Teacher Dashboard</a>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Right-side User Menu -->
+          <div class="hidden md:block">
+            <div class="ml-4 flex items-center md:ml-6 space-x-4">
+              {% if current_user.is_authenticated %}
+                <!-- User dropdown -->
+                <div class="relative group">
+                  <button type="button" class="max-w-xs bg-gray-800 rounded-md flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-2">
+                    <span class="sr-only">Open user menu</span>
+                    <span class="text-white font-medium">{{ current_user.name or 'User' }}</span>
+                    <i class="fas fa-chevron-down text-white text-xs ml-2 transform transition-transform duration-200 group-hover:rotate-180"></i>
+                  </button>
+                  <div class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-300 ease-in-out z-50">
+                    {% if current_user.role == 'student' %}
+                      <a href="{{ url_for('edit_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Edit Profile</a>
+                    {% elif current_user.role == 'teacher' %}
+                      <a href="{{ url_for('edit_teacher_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Edit Profile</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Sign out</a>
+                  </div>
+                </div>
+              {% else %}
+                <a href="{{ url_for('login') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200 hover:shadow-lg">Login</a>
+                <a href="{{ url_for('register') }}" class="text-gray-300 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200 hover:shadow-lg">Register</a>
+              {% endif %}
+            </div>
+          </div>
+          
+          <!-- Mobile menu button -->
+          <div class="-mr-2 flex md:hidden">
+            <button type="button" id="mobile-menu-button" class="bg-gray-800 inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white transition duration-200">
+              <span class="sr-only">Open main menu</span>
+              <i class="fas fa-bars"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Mobile menu, show/hide based on menu state. -->
+      <div class="md:hidden" id="mobile-menu" style="display:none;">
+        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+          <a href="{{ url_for('job_list') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Jobs</a>
           {% if current_user.is_authenticated %}
             {% if current_user.role == 'student' %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('student_dashboard') }}">Dashboard</a></li>
+              <a href="{{ url_for('student_dashboard') }}" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium" aria-current="page">Dashboard</a>
             {% elif current_user.role == 'teacher' %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher_dashboard') }}">Teacher Dashboard</a></li>
+              <a href="{{ url_for('teacher_dashboard') }}" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium" aria-current="page">Teacher Dashboard</a>
             {% endif %}
-          {% endif %}
-        </ul>
-        <ul class="navbar-nav">
-          {% if current_user.is_authenticated %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+            <a href="{{ url_for('logout') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Logout</a>
           {% else %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('register') }}">Register</a></li>
+            <a href="{{ url_for('login') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</a>
+            <a href="{{ url_for('register') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Register</a>
           {% endif %}
-        </ul>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Main Content -->
-  <main class="container my-5">
-    {% block content %}{% endblock %}
-  </main>
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div>
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-{% endwith %}
+      </div>
+    </header>
 
-  <!-- Footer -->
-  <footer>
-    <div class="container">
-      &copy; 2025 Know-Thyself Job Portal. All rights reserved.
+    <!-- Flash Messages Block -->
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-100 border-l-4 border-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-700 p-4 rounded-md mb-4" role="alert">
+              <div class="flex justify-between items-center">
+                <p class="font-bold">{{ message }}</p>
+                <button type="button" onclick="this.parentElement.parentElement.style.display='none';" class="text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-500 hover:text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-700 transition duration-150">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
     </div>
-  </footer>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
-  {% block scripts %}{% endblock %}
+    <!-- Page Content -->
+    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-auto">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row justify-between items-center md:items-start text-center md:text-left">
+          
+          <!-- Logo & Brand -->
+          <div class="mb-6 md:mb-0">
+            <a href="{{ url_for('startpage') }}" class="flex items-center justify-center md:justify-start space-x-2 text-white text-2xl font-bold">
+              <img src="https://res.cloudinary.com/ddqeqxamf/image/upload/v1754506544/psychology_logo_dqa0hs.jpg" alt="Know-Thyself Logo" class="h-10 w-auto rounded-lg">
+              <span>Know-Thyself</span>
+            </a>
+            <p class="mt-4 text-sm text-gray-500">&copy; 2025 Know-Thyself. All rights reserved.</p>
+          </div>
+          
+          <!-- Navigation Links -->
+          <div class="flex flex-wrap justify-center md:justify-start space-x-4 md:space-x-8 text-sm">
+            <a href="{{ url_for('about') }}" class="hover:text-white transition duration-200">About Us</a>
+            <a href="{{ url_for('resources') }}" class="hover:text-white transition duration-200">Resources</a>
+            <a href="{{ url_for('contact') }}" class="hover:text-white transition duration-200">Contact</a>
+            <a href="{{ url_for('support') }}" class="hover:text-white transition duration-200">Support</a>
+          </div>
+
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Simple script for mobile menu toggle
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    mobileMenuButton.addEventListener('click', () => {
+      const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+      mobileMenuButton.setAttribute('aria-expanded', !isExpanded);
+      if (isExpanded) {
+        mobileMenu.style.display = 'none';
+      } else {
+        mobileMenu.style.display = 'block';
+      }
+    });
+
+    // Custom script to handle click on dropdown button
+    const userDropdownButton = document.querySelector('.relative.group > button');
+    const userDropdownMenu = document.querySelector('.relative.group > div');
+    userDropdownButton.addEventListener('click', () => {
+      const isVisible = userDropdownMenu.classList.contains('opacity-100');
+      if (isVisible) {
+        userDropdownMenu.classList.remove('opacity-100', 'visible');
+        userDropdownMenu.classList.add('opacity-0', 'invisible');
+      } else {
+        userDropdownMenu.classList.remove('opacity-0', 'invisible');
+        userDropdownMenu.classList.add('opacity-100', 'visible');
+      }
+    });
+
+    // Close dropdown if clicked outside
+    document.addEventListener('click', (event) => {
+      const isClickInside = userDropdownButton.contains(event.target) || userDropdownMenu.contains(event.target);
+      if (!isClickInside && userDropdownMenu.classList.contains('opacity-100')) {
+        userDropdownMenu.classList.remove('opacity-100', 'visible');
+        userDropdownMenu.classList.add('opacity-0', 'invisible');
+      }
+    });
+  </script>
 </body>
 </html>
