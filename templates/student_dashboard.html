@@ -385,8 +385,12 @@
     </div>
 
     <!-- Preview -->
-    <div class="job-desc">
-      {{ job.job_description[:140] }}{% if job.job_description|length > 140 %}...{% endif %}
+      <div class="job-desc">
+{% if job.job_description %}
+  {{ job.job_description[:140] }}{% if job.job_description|length > 140 %}...{% endif %}
+{% else %}
+  <span class="text-muted fst-italic">No description available.</span>
+{% endif %}
     </div>
 
     <div class="text-success mb-2">Vacancies: {{ job.vacancies }}</div>
