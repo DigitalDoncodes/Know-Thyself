@@ -582,7 +582,7 @@ def apply(job_id):
 
     applications_count = mongo.db.applications.count_documents({
         "job_id": job_obj_id,
-        "status": {"$in": ["pending_resume", "submitted", "approved"]}
+        "status": {"$in": ["active_statuses"]}
     })
 
     if applications_count >= job.get("vacancies", 0):
