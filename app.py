@@ -156,6 +156,10 @@ def generate_otp():
 def startpage():
      return render_template("startpage.html")
 
+@app.route("/dementia-poster")
+def dementia_poster():
+    return render_template("dementia_poster.html")
+
 # Top of app.py or a separate file (growth_config.py)
 GROWTH_ACTIVITIES = [
     {"id": 1, "title": "Daily Mood Check-in", "desc": "How are you feeling right now?", "icon": "😊"},
