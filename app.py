@@ -25,7 +25,7 @@ from schemas import LoginForm, RegisterForm, JobForm, EditProfileForm, hash_pw, 
 
 # Import SMTP functions from the new smtp.py file
 import smtp
-from .smtp import send_application_status_email
+from smtp import send_application_status_email
 
 # Initialize Flask app
 app = Flask(__name__, template_folder="templates", static_folder="static")
