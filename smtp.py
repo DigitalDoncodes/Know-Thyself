@@ -1,6 +1,6 @@
 # smtp.py
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone 
 import pytz
 from flask import render_template, url_for, current_app
 from flask_mail import Message, Mail
@@ -24,8 +24,6 @@ def set_mail_instance(mail_instance):
 
 def send_confirmation_mail(applicant_email, applicant_name, application_id, job_title):
     """Send confirmation email to the student."""
-    print(f"DEBUG (smtp): Entered send_confirmation_mail for {applicant_email}")
-    print(f"DEBUG (smtp): Is mail initialized in send_confirmation_mail? {mail is not None}")
     if not mail:
         print("Mail instance not initialized in smtp.py (send_confirmation_mail)")
         return
@@ -55,8 +53,6 @@ def send_confirmation_mail(applicant_email, applicant_name, application_id, job_
 
 def send_otp_email(to_email, otp):
     """Send OTP email for password change verification"""
-    print(f"DEBUG (smtp): Entered send_otp_email for {to_email}")
-    print(f"DEBUG (smtp): Is mail initialized in send_otp_email? {mail is not None}")
     if not mail:
         print("Mail instance not initialized in smtp.py (send_otp_email)")
         return
@@ -75,8 +71,6 @@ def send_otp_email(to_email, otp):
 
 def send_resume_and_photo_mail(resume_filename, photo_filename, applicant_email, job_title):
     """Sends student's resume and photo as attachments to the admin."""
-    print(f"DEBUG (smtp): Entered send_resume_and_photo_mail for {applicant_email}")
-    print(f"DEBUG (smtp): Is mail initialized in send_resume_and_photo_mail? {mail is not None}")
     if not mail:
         print("Mail instance not initialized in smtp.py (send_resume_and_photo_mail)")
         return
@@ -86,7 +80,7 @@ def send_resume_and_photo_mail(resume_filename, photo_filename, applicant_email,
             msg = Message(
                 subject=f"New Résumé & Photo for '{job_title}'",
                 sender=current_app.config.get("MAIL_USERNAME"),
-                recipients=[os.getenv("NOTICE_MAILBOX", "admin@example.com")] # Fallback admin email
+                recipients=[os.getenv("NOTICE_MAILBOX", "admin@example.com")]
             )
             msg.body = (
                 f"Student {applicant_email} has uploaded a résumé and photo for job '{job_title}'."
@@ -115,8 +109,6 @@ def send_resume_and_photo_mail(resume_filename, photo_filename, applicant_email,
 
 def send_admin_notification(student_name, job_title, student_email):
     """Sends a notification to the admin about a new application."""
-    print(f"DEBUG (smtp): Entered send_admin_notification for {student_email}")
-    print(f"DEBUG (smtp): Is mail initialized in send_admin_notification? {mail is not None}")
     if not mail:
         print("Mail instance not initialized in smtp.py (send_admin_notification)")
         return
@@ -141,10 +133,13 @@ Check the admin panel to review it.
     except Exception as e:
         print(f"❌ Error sending admin notification email: {e}")
 
-def send_application_status_email(student_email, student_name, status, job_title, feedback=None):
+# CORRECTED VERSION FOR ASYNCHRONOUS CONTEXT
+# In smtp.py, replace the entire send_application_status_email function with this:
+
+# CORRECTED VERSION FOR ASYNCHRONOUS CONTEXT
+# Function signature changed to accept 'app'
+def send_application_status_email(app, student_email, student_name, status, job_title, feedback=None):
     """Sends application status updates (approved, rejected, corrections_needed) to students."""
-    print(f"DEBUG (smtp): Entered send_application_status_email for {student_email} with status '{status}'")
-    print(f"DEBUG (smtp): Is mail initialized in send_application_status_email? {mail is not None}")
     if not mail:
         print("Mail instance not initialized in smtp.py (send_application_status_email)")
         return
@@ -162,7 +157,9 @@ def send_application_status_email(student_email, student_name, status, job_title
     template_name, subject = templates[status]
     
     try:
-        with current_app.app_context():
+        # THE FIX: Run this in the application context passed from app.py
+        with app.app_context():
+            # This relies on app.config['SERVER_NAME'] being set in app.py
             portal_link = url_for('student_dashboard', _external=True)
 
             html_body = render_template(
@@ -179,4 +176,3 @@ def send_application_status_email(student_email, student_name, status, job_title
         print(f"[✓] Email sent to {student_email} – {status}")
     except Exception as e:
         print(f"[✘] Error sending email: {e}")
-
