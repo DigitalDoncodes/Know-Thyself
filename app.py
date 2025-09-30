@@ -38,6 +38,7 @@ app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = ('Psychology Job Portal', 'psychologyresumemail@gmail.com')
+app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '127.0.0.1:10000') 
 
 # Set UPLOAD_FOLDER and MAX_CONTENT_LENGTH from environment variables
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
@@ -499,6 +500,9 @@ def upload_resume(job_id):
 def guidelines():
     return render_template("guidelines_modal.html")
 
+# Corrected student_dashboard function
+# In app.py, replace the student_dashboard function with this:
+# In app.py, replace the entire student_dashboard function with this:
 @app.route("/student/")
 @login_required
 def student_dashboard():
@@ -525,20 +529,27 @@ def student_dashboard():
         student_applications = mongo.db.applications.find({"user_id": ObjectId(current_user.id)})
         applied_ids = {app["job_id"] for app in student_applications}
 
-
     has_active_application = any(
         app.get("status") in ("pending_resume", "submitted", "approved") for app in apps
     )
 
-    now_ist = datetime.now(IST) 
+    # In app.py, inside the student_dashboard function, replace the entire loop:
+# ...
+    now_ist = datetime.now(IST)
     for app in apps:
         status = app.get("status", "")
+        app["is_reupload_allowed"] = False
+        app["reupload_deadline_ist"] = "N/A" # Simplified
+        app["reupload_remaining_time"] = "N/A" # Simplified
+        
         if status == "approved":
             app["status_message"] = "🎉 Yay! Your application is approved."
         elif status == "rejected":
             app["status_message"] = "😞 Unfortunately, your application was rejected."
         elif status == "corrections_needed":
             app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
+            # FIX 2: Re-upload is always allowed when corrections are needed (omitting time limit)
+            app["is_reupload_allowed"] = True
         else:
             app["status_message"] = ""
 
@@ -547,7 +558,11 @@ def student_dashboard():
             app["resume_deadline"] = pytz.utc.localize(deadline).astimezone(IST)
         else:
             app["resume_deadline"] = deadline.astimezone(IST) if deadline else None
-
+        
+        # --- DEBUGGING LINE (Corrected Dict Access) ---
+        print(f"DEBUG: App ID: {app['_id']}, Status: {app.get('status')}, Is Reupload Allowed: {app['is_reupload_allowed']}")
+        # --- END DEBUGGING LINE ---
+# ...
     return render_template(
         "student_dashboard.html",
         apps=apps,
@@ -557,6 +572,84 @@ def student_dashboard():
         now=now_ist
     )
 
+# In app.py, replace the update_application_status function with this:
+# In app.py
+# ...
+
+@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+@login_required
+def update_application_status(app_id):
+    if current_user.role != "teacher":
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    status = request.form.get("status")
+    feedback = request.form.get("feedback", "").strip()
+
+    if status not in {"approved", "rejected", "needs_corrections"}:
+        flash("Invalid status.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc:
+        flash("Application not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
+    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
+    
+    if not student_doc or not job_doc:
+        flash("Related student or job data not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    update_fields = {
+        "status": status, 
+        "teacher_feedback": feedback
+    }
+    
+    # Store corrections_at, even if we are not actively enforcing it now
+    if status == "needs_corrections":
+        update_fields["corrections_at"] = datetime.now(timezone.utc)
+
+    mongo.db.applications.update_one(
+        {"_id": ObjectId(app_id)},
+        {"$set": update_fields}
+    )
+
+    # FIX 1: Pass the 'app' object to the scheduler
+    scheduler.add_job(
+        func=send_application_status_email,
+        trigger='date',
+        run_date=datetime.now() + timedelta(seconds=1),
+        args=[
+            app,  # <--- THIS IS THE APP OBJECT BEING PASSED
+            student_doc["email"],
+            student_doc["name"],
+            status,
+            job_doc["title"],
+            feedback
+        ]
+    )
+    
+    flash("Application updated. An email notification will be sent shortly.", "success")
+    return redirect(url_for("assess_students"))
+
+# In app.py, replace the resume_reupload function with this:
+@app.route("/resume/reupload/<app_id>", methods=["POST"])
+@login_required
+def resume_reupload(app_id):
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+
+    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
+        flash("Unauthorized re-upload attempt.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    # The time-based check is no longer needed
+    if app_doc.get("status") != "corrections_needed":
+        flash("You can only re-upload when corrections are requested.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
 @app.route("/apply/<job_id>", methods=["POST"])
 @login_required
 def apply(job_id):
@@ -766,22 +859,62 @@ def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=Tru
 
     return redirect(url_for("student_dashboard"))
 
-@app.route("/resume/reupload/<app_id>", methods=["POST"])
-@login_required
-def resume_reupload(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
 
-    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
-        flash("Unauthorized re-upload attempt.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    if app_doc["status"] != "corrections_needed":
-        flash("You can only re-upload when corrections are requested.", "danger")
-        return redirect(url_for("student_dashboard"))
+    # New: Check if the 24-hour re-upload window has expired
+    corrections_at = app_doc.get("corrections_at")
+    if corrections_at:
+        deadline = corrections_at + timedelta(hours=24)
+        if datetime.now(timezone.utc) > deadline:
+            flash("The 24-hour re-upload window has expired.", "danger")
+            # Optional: automatically set status to rejected_auto
+            mongo.db.applications.update_one(
+                {"_id": ObjectId(app_doc["_id"])},
+                {"$set": {"status": "rejected_auto"}}
+            )
+            return redirect(url_for("student_dashboard"))
 
     return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
- 
 
+# In app.py, add this new route
+@app.route("/teacher/reassign_reupload_time/<app_id>", methods=["POST"])
+@teacher_required
+def reassign_reupload_time(app_id):
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc:
+        flash("Application not found.", "danger")
+        return redirect(url_for("assess_students"))
+
+    if app_doc.get("status") != "corrections_needed":
+        flash("Can only re-assign time for applications needing corrections.", "danger")
+        return redirect(url_for("assess_students"))
+
+    new_timestamp = datetime.now(timezone.utc)
+    mongo.db.applications.update_one(
+        {"_id": ObjectId(app_id)},
+        {"$set": {"corrections_at": new_timestamp}}
+    )
+
+    # Send a notification email to the student about the new deadline
+    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
+    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
+    if student_doc and job_doc:
+        # We can reuse the same email function, but with a different message if you wish.
+        # Here we just re-send the 'corrections_needed' email.
+        scheduler.add_job(
+            func=send_application_status_email,
+            trigger='date',
+            run_date=datetime.now() + timedelta(seconds=1),
+            args=[
+                student_doc["email"],
+                student_doc["name"],
+                "needs_corrections",
+                job_doc["title"],
+                app_doc.get("teacher_feedback", "")
+            ]
+        )
+
+    flash("Re-upload window has been reset for the student.", "success")
+    return redirect(url_for("assess_students"))
 # --- Teacher Routes ---
 @app.route("/teacher/")
 @teacher_required
@@ -1585,54 +1718,7 @@ def virtual_pet_dog_chat():
     ]
     return jsonify({"reply": random.choice(replies)})
     
-@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
-@login_required
-def update_application_status(app_id):
-    if current_user.role != "teacher":
-        flash("Unauthorized access.", "danger")
-        return redirect(url_for("student_dashboard"))
 
-    # Get the status and feedback from the submitted form
-    status = request.form.get("status")
-    feedback = request.form.get("feedback", "").strip()
-
-    # Validate the status
-    if status not in {"approved", "rejected", "needs_corrections"}:
-        flash("Invalid status.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    # Find the application to get student and job details
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc:
-        flash("Application not found.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    # Find the associated student and job documents
-    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
-    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    
-    if not student_doc or not job_doc:
-        flash("Related student or job data not found.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    # Update the application status and feedback in the database
-    mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": {"status": status, "teacher_feedback": feedback}}
-    )
-
-    # Schedule the email to be sent asynchronously
-    # Synchronous call for debugging purposes
-    send_application_status_email(
-        student_doc["email"],
-        student_doc["name"],
-        status,
-        job_doc["title"],
-        feedback
-    )
-    
-    flash("Application updated. An email notification will be sent shortly.", "success")
-    return redirect(url_for("assess_students"))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
