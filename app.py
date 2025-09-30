@@ -1252,12 +1252,12 @@ def edit_teacher_profile():
 
     return render_template("edit_teacher_profile.html", form=form)
 
+# The corrected export_assessed_students function
 @app.route("/teacher/export_assessed")
 @teacher_required
 def export_assessed_students():
-    assessed_statuses = ["approved", "rejected", "corrections_needed"]
+    # Fetch all applications, regardless of status
     pipeline = [
-        {"$match": {"status": {"$in": assessed_statuses}}},
         {
             "$lookup": {
                 "from": "users",
@@ -1284,6 +1284,7 @@ def export_assessed_students():
     for app in results:
         row = {
             "Student Name": app["user"].get("name", ""),
+            "Student ID": app["user"].get("student_id", ""),
             "Student Email": app["user"].get("email", ""),
             "Job Title": app["job"].get("title", ""),
             "Status": app.get("status", "").replace("_", " ").title(),
@@ -1296,17 +1297,16 @@ def export_assessed_students():
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Assessed Students")
+        df.to_excel(writer, index=False, sheet_name="All Applications")
     output.seek(0)
 
-    filename = f"Assessed_Students_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
+    filename = f"All_Applications_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
     return send_file(
         output,
         download_name=filename,  
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
 # ---------- File Serving Routes ----------
 @app.route("/uploads/<path:filename>")
 @login_required
@@ -1584,8 +1584,7 @@ def virtual_pet_dog_chat():
         "If you need advice, just ask. I'm a very good dog."
     ]
     return jsonify({"reply": random.choice(replies)})
-
-# The corrected update_application_status function with proper indentation
+    
 @app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
 @login_required
 def update_application_status(app_id):
@@ -1623,22 +1622,17 @@ def update_application_status(app_id):
     )
 
     # Schedule the email to be sent asynchronously
-    scheduler.add_job(
-        func=send_application_status_email,
-        trigger='date',
-        run_date=datetime.now() + timedelta(seconds=1),  # Run in 1 second
-        args=[
-            student_doc["email"],
-            student_doc["name"],
-            status,
-            job_doc["title"],
-            feedback
-        ]
+    # Synchronous call for debugging purposes
+    send_application_status_email(
+        student_doc["email"],
+        student_doc["name"],
+        status,
+        job_doc["title"],
+        feedback
     )
     
     flash("Application updated. An email notification will be sent shortly.", "success")
     return redirect(url_for("assess_students"))
-    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
