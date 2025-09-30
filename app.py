@@ -1584,7 +1584,9 @@ def virtual_pet_dog_chat():
         "If you need advice, just ask. I'm a very good dog."
     ]
     return jsonify({"reply": random.choice(replies)})
-    @app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+
+# The corrected update_application_status function with proper indentation
+@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
 @login_required
 def update_application_status(app_id):
     if current_user.role != "teacher":
@@ -1636,6 +1638,7 @@ def update_application_status(app_id):
     
     flash("Application updated. An email notification will be sent shortly.", "success")
     return redirect(url_for("assess_students"))
+    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
