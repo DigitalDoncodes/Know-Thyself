@@ -37,7 +37,7 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = ('Psychology Job Portal', 'no-reply@psychportal.com')
+app.config['MAIL_DEFAULT_SENDER'] = ('Psychology Job Portal', 'psychologyresumemail@gmail.com')
 
 # Set UPLOAD_FOLDER and MAX_CONTENT_LENGTH from environment variables
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
