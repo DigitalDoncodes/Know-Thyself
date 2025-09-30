@@ -25,6 +25,7 @@ from schemas import LoginForm, RegisterForm, JobForm, EditProfileForm, hash_pw, 
 
 # Import SMTP functions from the new smtp.py file
 import smtp
+from .smtp import send_application_status_email
 
 # Initialize Flask app
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -1305,6 +1306,48 @@ def export_assessed_students():
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+@login_required
+def update_application_status(app_id):
+    # ... (your existing code to get status and feedback) ...
+
+    # Look up the application and related user/job data for the email
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc:
+        flash("Application not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
+    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
+
+    if not student_doc or not job_doc:
+        flash("Related student or job data not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    # Perform the database update first
+    mongo.db.applications.update_one(
+        {"_id": ObjectId(app_id)},
+        {"$set": {"status": status, "teacher_feedback": feedback}}
+    )
+
+    # Schedule the email sending as a background job
+    scheduler.add_job(
+        func=send_application_status_email,
+        trigger='date',
+        run_date=datetime.now() + timedelta(seconds=1), # Run in a second
+        args=[
+            student_doc["email"], 
+            student_doc["name"], 
+            status, 
+            job_doc["title"], 
+            feedback
+        ]
+    )
+
+    flash("Application updated. Email will be sent shortly.", "success")
+    return redirect(url_for("teacher_dashboard"))
+
 
 # ---------- File Serving Routes ----------
 @app.route("/uploads/<path:filename>")
