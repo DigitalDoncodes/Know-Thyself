@@ -1627,53 +1627,58 @@ def virtual_pet_dog_chat():
     ]
     return jsonify({"reply": random.choice(replies)})
     
-@app.route('/teacher/update_application/<application_id>', methods=['POST'])
+@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
 @login_required
-def update_application_from_dashboard(application_id):
-    status = request.form.get('status')
-    feedback = request.form.get('feedback', "").strip()
+def update_application_status(app_id):
+    if current_user.role != "teacher":
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("student_dashboard"))
 
-    print(f"DEBUG (app.py route): update_application_status called for app_id: {application_id}")
-    print(f"DEBUG (app.py route): Status received: {status}, Feedback: {feedback}")
+    # Get the status and feedback from the submitted form
+    status = request.form.get("status")
+    feedback = request.form.get("feedback", "").strip()
 
-    if status not in ["approved", "rejected", "needs_corrections"]:
-        flash("Invalid application status submitted.", "danger")
+    # Validate the status
+    if status not in {"approved", "rejected", "needs_corrections"}:
+        flash("Invalid status.", "danger")
         return redirect(url_for("teacher_dashboard"))
 
-    application = mongo.db.applications.find_one({"_id": ObjectId(application_id)})
-    if not application:
+    # Find the application to get student and job details
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc:
         flash("Application not found.", "danger")
         return redirect(url_for("teacher_dashboard"))
 
-    student = mongo.db.users.find_one({"_id": ObjectId(application["user_id"])})
-    job = mongo.db.jobs.find_one({"_id": ObjectId(application["job_id"])})
+    # Find the associated student and job documents
+    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
+    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
+    
+    if not student_doc or not job_doc:
+        flash("Related student or job data not found.", "danger")
+        return redirect(url_for("teacher_dashboard"))
 
-    print(f"DEBUG (app.py route): Found student: {student['email']}, job: {job['title']}")
-
-    # Update application in database
+    # Update the application status and feedback in the database
     mongo.db.applications.update_one(
-        {"_id": ObjectId(application_id)},
-        {"$set": {
-            "status": status,
-            "teacher_feedback": feedback,
-            "updated_at": datetime.utcnow()
-        }}
+        {"_id": ObjectId(app_id)},
+        {"$set": {"status": status, "teacher_feedback": feedback}}
     )
-    print(f"DEBUG (app.py route): Database updated for application {application_id}")
 
-    # Send notification email
-    smtp.send_application_status_email(
-        student_email=student["email"],
-        student_name=student.get("name", "Student"),
-        status=status,
-        job_title=job.get("title", "Your Job Application"),
-        feedback=feedback if status == "needs_corrections" else None
+    # Schedule the email to be sent asynchronously
+    scheduler.add_job(
+        func=send_application_status_email,
+        trigger='date',
+        run_date=datetime.now() + timedelta(seconds=1), # Run in 1 second
+        args=[
+            student_doc["email"],
+            student_doc["name"],
+            status,
+            job_doc["title"],
+            feedback
+        ]
     )
-    print(f"DEBUG (app.py route): smtp.send_application_status_email called.")
-
-    flash("✅ Application updated and student notified.", "success")
-    return redirect(url_for("teacher_dashboard"))
-
+    
+    flash("Application updated. An email notification will be sent shortly.", "success")
+    return redirect(url_for("assess_students"))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
