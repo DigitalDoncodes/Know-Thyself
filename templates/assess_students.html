@@ -103,8 +103,8 @@
                 {% endif %}
               </td>
               <td class="px-6 py-4 text-sm text-gray-500">
-                <form method="post" action="{{ url_for('update_application_status', application_id=app._id) }}" class="flex flex-col space-y-2">
-                  <textarea name="feedback" rows="2" class="form-control rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Enter feedback...">{{ app.teacher_feedback }}</textarea>
+              <form method="post" action="{{ url_for('update_application_status', app_id=app._id) }}" class="flex flex-col space-y-2">
+              <textarea name="feedback" rows="2" class="form-control rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Enter feedback...">{{ app.teacher_feedback }}</textarea>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <select name="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 mb-2" required>
