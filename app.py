@@ -1626,10 +1626,10 @@ def virtual_pet_dog_chat():
         "If you need advice, just ask. I'm a very good dog."
     ]
     return jsonify({"reply": random.choice(replies)})
-
+    
 @app.route('/teacher/update_application/<application_id>', methods=['POST'])
 @login_required
-def update_application_status(application_id):
+def update_application_from_dashboard(application_id):
     status = request.form.get('status')
     feedback = request.form.get('feedback', "").strip()
 
