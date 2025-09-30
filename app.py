@@ -1584,8 +1584,7 @@ def virtual_pet_dog_chat():
         "If you need advice, just ask. I'm a very good dog."
     ]
     return jsonify({"reply": random.choice(replies)})
-    
-@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+    @app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
 @login_required
 def update_application_status(app_id):
     if current_user.role != "teacher":
@@ -1622,13 +1621,17 @@ def update_application_status(app_id):
     )
 
     # Schedule the email to be sent asynchronously
-    # Synchronous call for debugging purposes
-    send_application_status_email(
-        student_doc["email"],
-        student_doc["name"],
-        status,
-        job_doc["title"],
-        feedback
+    scheduler.add_job(
+        func=send_application_status_email,
+        trigger='date',
+        run_date=datetime.now() + timedelta(seconds=1),  # Run in 1 second
+        args=[
+            student_doc["email"],
+            student_doc["name"],
+            status,
+            job_doc["title"],
+            feedback
+        ]
     )
     
     flash("Application updated. An email notification will be sent shortly.", "success")
