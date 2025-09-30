@@ -1622,17 +1622,13 @@ def update_application_status(app_id):
     )
 
     # Schedule the email to be sent asynchronously
-    scheduler.add_job(
-        func=send_application_status_email,
-        trigger='date',
-        run_date=datetime.now() + timedelta(seconds=1), # Run in 1 second
-        args=[
-            student_doc["email"],
-            student_doc["name"],
-            status,
-            job_doc["title"],
-            feedback
-        ]
+    # Synchronous call for debugging purposes
+    send_application_status_email(
+        student_doc["email"],
+        student_doc["name"],
+        status,
+        job_doc["title"],
+        feedback
     )
     
     flash("Application updated. An email notification will be sent shortly.", "success")
