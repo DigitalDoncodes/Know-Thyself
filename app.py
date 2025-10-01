@@ -547,9 +547,16 @@ def guidelines():
     return render_template("guidelines_modal.html")
 
 # In app.py, replace the entire student_dashboard function with this:
+# In app.py, replace the entire student_dashboard function with this:
 @app.route("/student/")
 @login_required
 def student_dashboard():
+    # --- FIX 1: Set SERVER_NAME if not explicitly set in environment ---
+    # This ensures asynchronous url_for() calls (used in email) work, 
+    # as gunicorn needs a domain name.
+    if not app.config.get('SERVER_NAME'):
+        app.config['SERVER_NAME'] = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '127.0.0.1:10000')
+
     if current_user.role != "student":
         return redirect(url_for("teacher_dashboard"))
 
@@ -580,20 +587,17 @@ def student_dashboard():
     now_ist = datetime.now(IST)
     for app in apps:
         status = app.get("status", "")
-        
-        # --- FIX: Initialize all required keys before using them ---
         app["is_reupload_allowed"] = False
-        app["reupload_deadline_ist"] = "N/A"
-        app["reupload_remaining_time"] = "N/A"
-        # --------------------------------------------------------
-
+        app["reupload_deadline_ist"] = "N/A" # Simplified
+        app["reupload_remaining_time"] = "N/A" # Simplified
+        
         if status == "approved":
             app["status_message"] = "🎉 Yay! Your application is approved."
         elif status == "rejected":
             app["status_message"] = "😞 Unfortunately, your application was rejected."
         elif status == "corrections_needed":
             app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
-            # FIX: Re-upload is always allowed when corrections are needed
+            # FIX 2: Re-upload is always allowed (logic override)
             app["is_reupload_allowed"] = True
         else:
             app["status_message"] = ""
@@ -616,9 +620,6 @@ def student_dashboard():
         has_active=has_active_application,
         now=now_ist
     )
-# In app.py, replace the update_application_status function with this:
-# In app.py
-# ...
 
 @app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
 @login_required
