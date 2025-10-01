@@ -1,289 +1,223 @@
-# app.py
 import os
-import random
+import datetime
+import filetype
+from bson.objectid import ObjectId
+from flask import flash, redirect, url_for
+from flask_login import current_user, login_required
+from datetime import datetime, timedelta
+import datetime
 import io
 import pandas as pd
-import filetype
-from datetime import datetime, timedelta, timezone
-from werkzeug.security import check_password_hash
-
-import pytz
-from functools import wraps
+from datetime import datetime
+from bson import ObjectId 
+from flask_wtf import FlaskForm
 from bson.objectid import ObjectId
-from werkzeug.utils import secure_filename
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, IntegerField, SubmitField
+from wtforms.validators import DataRequired
+from flask import abort, session
+from wtforms import StringField, SubmitField, PasswordField, FileField, IntegerField, TextAreaField
+from wtforms.validators import DataRequired, Email, Length, Optional, EqualTo
 from flask import (
     Flask, render_template, redirect, url_for, request,
-    flash, send_from_directory, send_file, session, abort, current_app
+    flash, send_from_directory, send_file
 )
-from flask_login import login_user, logout_user, login_required, current_user
+from flask_pymongo import PyMongo
+from flask_login import (
+    LoginManager, login_user, logout_user, login_required,
+    current_user, UserMixin
+)
+from passlib.hash import bcrypt
+from flask_mail import Mail, Message
+import random
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
+from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
+import pytz
 
+from flask import Flask
+from flask_pymongo import PyMongo
+import os
+
+app = Flask(__name__)
+
+# Get the Mongo URI from Render (or .env for local)
+import os
+app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
+
+mongo = PyMongo(app)
+
+
+IST = pytz.timezone('Asia/Kolkata')
+now_ist = datetime.now(IST)
+deadline = now_ist + timedelta(hours=48)
+
+# ---------- App Setup and Configuration ----------
+
+# Load environment variables from .env file securely
 load_dotenv()
 
-from db import mongo, login_manager, scheduler, IST, User, init_extensions
-from schemas import LoginForm, RegisterForm, JobForm, EditProfileForm, hash_pw, check_pw, SelfAssessmentForm
-
-# Import SMTP functions from the new smtp.py file
-import smtp
-from smtp import send_application_status_email
-
-# Initialize Flask app
+# Instantiate Flask app with template and static folders
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Configure your SMTP settings
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] =587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = ('Psychology Job Portal', 'psychologyresumemail@gmail.com')
-app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '127.0.0.1:10000') 
+# Configure app settings
+app.config.from_mapping(
+    SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret"),
+    UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "uploads"),
+    MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)),  # 5MB default max upload size
+    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT", 465)),
+    MAIL_USE_TLS=os.getenv("MAIL_USE_TLS", "false").lower() == "true",
+    MAIL_USE_SSL=os.getenv("MAIL_USE_SSL", "true").lower() == "true",
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+)
 
-# Set UPLOAD_FOLDER and MAX_CONTENT_LENGTH from environment variables
-app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 7 * 1024 * 1024))
+# Ensure upload folder exists
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-# Initialize Flask extensions
-init_extensions(app)
-
-# Initialize Flask-Mail and set it in the smtp module for cross-module usage
-
-
-# Load MongoDB URI from environment variables
-app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-
-# Enable Flask-Mail Debugging for detailed output
-app.config['MAIL_DEBUG'] = True
+# Setup extensions: MongoDB, Mail, Login Manager, Scheduler
+mongo = PyMongo(app)
+mail = Mail(app)
+login_manager = LoginManager(app)
+scheduler = BackgroundScheduler()
+scheduler.start()
 
 
-def teacher_required(f):
-    """Decorator to restrict access to teachers only."""
-    @wraps(f)
-    @login_required
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "teacher":
-            flash("You must be a teacher to access this page.", "warning")
-            return redirect(url_for("startpage"))
-        return f(*args, **kwargs)
-    return decorated_function
+# ---------- User Model ----------
+
+class User(UserMixin):
+    """User class wrapping MongoDB user document for Flask-Login"""
+
+    def __init__(self, doc):
+        self.id = str(doc["_id"])
+        self.role = doc["role"]
+        self.email = doc["email"]
+        self.student_id = doc.get("student_id")  # Optional
+        self.name = doc["name"]
+
+    @staticmethod
+    def get(user_id):
+        """Load user by MongoDB ObjectId string"""
+        doc = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+        return User(doc) if doc else None
 
 
-def generate_growth_modules():
-    """Generates a list of growth activity modules for the Growth Hub."""
-    titles = [
-        "How are you feeling emotionally today?",
-        "Describe one positive thing that happened today.",
-        "Rate your energy level on a scale from 1 to 10.",
-        "What's your intention for today?",
-        "Write a message to your future self.",
-        "What are you grateful for this week?",
-        "Unscramble the word: LPAEP",
-        "Complete the pattern: 3, 6, 9, 12, ___",
-        "Solve: What is 25 + 17?",
-        "Write a compliment you'd give yourself.",
-        "If emotions could speak, what would yours say?",
-        "What's something challenging you overcame recently?",
-        "Write a short poem or haiku.",
-        "What’s your happiest memory as a child?",
-        "How would you describe yourself in 3 words?",
-        "Have you helped anyone today? How?",
-        "What is one hobby you'd love to try?",
-        "List 3 people you admire and why.",
-        "What motivates you each morning?",
-        "Draw or describe your mood as an animal (e.g., sloth = tired)",
-        "Word association: Ocean : Water :: Forest : ___",
-        "How do you express creativity?",
-        "If you could learn anything instantly, what would it be?",
-        "What does 'success' mean to you?",
-        "How calm or anxious do you feel? (1–10)",
-        "What do you need less of in your life?",
-        "Rapid journal: Write whatever’s on your mind (no filter).",
-        "What's your biggest win from this month?",
-        "Draw/write your superpower!",
-        "What's something you're proud of recently?",
-        "How do you recharge?",
-        "Who do you look up to, and what lesson did they teach you?",
-        "Write 3 affirmations starting with: I am...",
-        "Design your dream day.",
-        "What makes you feel confident?",
-        "What would your ideal future look like in 5 years?",
-        "If today had a theme song, what would it be?",
-        "Describe a safe space in your imagination.",
-        "Write a thank-you note (to self or others).",
-        "Have you laughed today? What made you laugh?",
-        "How do you want to grow emotionally?",
-        "Describe a time you overcame fear.",
-        "List 3 small things you can do to feel better instantly.",
-        "If you could only keep one value (e.g., honesty, joy), what would it be?",
-        "Design a personal logo — describe/visualize it.",
-        "Finish this sentence: 'I trust that...'",
-        "What's something beautiful you witnessed recently?",
-        "Write a dream you had or want to have.",
-        "What’s one thing that surprises people about you?",
-        "Complete the sentence: 'Right now, I feel ___ because ___'."
-    ]
+@login_manager.user_loader
+def load_user(user_id):
+    """Flask-Login user loader callback"""
+    return User.get(user_id)
 
-    modules = []
-    for i, title in enumerate(titles, start=1):
-        field = f"q{i}"
-        html = f'<textarea name="{field}" placeholder="Write here..." rows="3" required></textarea>'
-        modules.append({"title": title, "html": html})
-    return modules
+
+# ---------- Forms ----------
+
+class LoginForm(FlaskForm):
+    """Login form accepting email or student ID"""
+    email_or_sid = StringField("Email or Student ID", validators=[DataRequired()])
+    password     = PasswordField("Password", validators=[DataRequired()])
+    submit       = SubmitField("Sign In")
+
+
+class RegisterForm(FlaskForm):
+    """Registration form for students"""
+    student_id = StringField("Student ID", validators=[DataRequired()])
+    name       = StringField("Full Name", validators=[DataRequired()])
+    email      = StringField("Email", validators=[Email(), DataRequired()])
+    phone      = StringField("Phone", validators=[Length(min=8), DataRequired()])
+    password   = PasswordField(
+        "Password",
+        validators=[Length(min=8), EqualTo("confirm", "Passwords must match")],
+    )
+    confirm    = PasswordField("Repeat Password")
+    submit     = SubmitField("Create Account")
+
+
+class JobForm(FlaskForm):
+    """Form to create or edit a job"""
+    title       = StringField("Job Title", validators=[DataRequired()])
+    description = TextAreaField("Description", validators=[DataRequired()])
+    vacancies   = IntegerField("Vacancies", validators=[DataRequired()])
+    pof         = FileField("PoF (PDF)")
+    submit      = SubmitField("Save")
+
+
+class EditProfileForm(FlaskForm):
+    """Form for student profile editing with optional password change"""
+    name = StringField("Full Name", validators=[DataRequired()])
+    email = StringField("Email", validators=[Email(), DataRequired()])
+    phone = StringField("Phone", validators=[Length(min=8), DataRequired()])
+    password = PasswordField(
+        "New Password", validators=[Optional(), Length(min=8)]
+    )
+    confirm = PasswordField(
+        "Repeat Password",
+        validators=[EqualTo("password", "Passwords must match"), Optional()]
+    )
+    submit = SubmitField("Save Changes")
+
+
+# ---------- Helper Functions ----------
+
+def hash_pw(raw):
+    """Hash a raw password"""
+    return bcrypt.hash(raw)
+
+def check_pw(raw, h):
+    """Verify a password against hash"""
+    return bcrypt.verify(raw, h)
+
+def send_resume_mail(filename, applicant_email):
+    """Send email to notify about new résumé submission"""
+    msg = Message(
+        "New Résumé Submission",
+        sender=app.config["MAIL_USERNAME"],
+        recipients=[os.getenv("NOTICE_MAILBOX")]
+    )
+    msg.body = f"Résumé from {applicant_email}"
+    with app.open_resource(os.path.join(app.config["UPLOAD_FOLDER"], filename)) as fp:
+        msg.attach(filename, "application/pdf", fp.read())
+    mail.send(msg)
 
 def cleanup_deadlines():
     """Mark applications with expired upload window as rejected_auto"""
-    now_utc = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     expired = mongo.db.applications.find({
         "resume_filename": {"$exists": False},
-        "resume_deadline": {"$lt": now_utc},
+        "resume_deadline": {"$lt": now},
     })
     for doc in expired:
         mongo.db.applications.update_one(
             {"_id": doc["_id"]}, {"$set": {"status": "rejected_auto"}}
         )
 
+# Schedule deadline cleanup every 12 hours
 scheduler.add_job(cleanup_deadlines, "interval", hours=12)
 
 def generate_otp():
     """Generate a 6-digit OTP"""
     return str(random.randint(100000, 999999))
 
+def send_otp_email(to_email, otp):
+    """Send OTP email for password change verification"""
+    msg = Message(
+        subject='Your OTP for Password Change',
+        sender=app.config["MAIL_USERNAME"],
+        recipients=[to_email]
+    )
+    msg.body = f"Your OTP to change your password is: {otp}\nIf you did not request this, ignore this email."
+    mail.send(msg)
+
 
 # ---------- Routes ----------
 
+# --- Homepage showing Public Jobs ---
 @app.route("/")
 def startpage():
-     return render_template("startpage.html")
+    # This ALWAYS shows the startup page/quote, no matter user type or login status
+    return render_template("startpage.html")
 
-@app.route("/dementia-poster")
-def dementia_poster():
-    return render_template("dementia_poster.html")
-
-# Top of app.py or a separate file (growth_config.py)
-GROWTH_ACTIVITIES = [
-    {"id": 1, "title": "Daily Mood Check-in", "desc": "How are you feeling right now?", "icon": "😊"},
-    {"id": 2, "title": "Gratitude Journal", "desc": "List three things you're thankful for today.", "icon": "🌟"},
-    {"id": 3, "title": "Describe Your Day in One Word", "desc": "Summarize your day using just one word.", "icon": "🔤"},
-    {"id": 4, "title": "Positive Affirmation", "desc": "Write a phrase to empower your day.", "icon": "💪"},
-    {"id": 5, "title": "Today's Big Win", "desc": "What is one thing you accomplished today?", "icon": "🏆"},
-    {"id": 6, "title": "Challenge Reflection", "desc": "Describe a difficulty you managed today.", "icon": "🎯"},
-    {"id": 7, "title": "Letter to Future Self", "desc": "Write a note to yourself in one year.", "icon": "✉️"},
-    {"id": 8, "title": "Self-Compassion Check", "desc": "List two ways you showed yourself kindness.", "icon": "🤗"},
-    {"id": 9, "title": "One Act of Kindness", "desc": "What did you do for someone else today?", "icon": "🤝"},
-    {"id": 10, "title": "Goal for Tomorrow", "desc": "Set a small goal for the next day.", "icon": "🎯"},
-    {"id": 11, "title": "Stress Level Meter", "desc": "Rate your stress today (1–10) and why.", "icon": "📊"},
-    {"id": 12, "title": "Best Memory This Week", "desc": "Describe a highlight of your week so far.", "icon": "📸"},
-    {"id": 13, "title": "A Favorite Song", "desc": "Share a song that lifts your mood.", "icon": "🎵"},
-    {"id": 14, "title": "Random Act of Joy", "desc": "What random thing brought you joy today?", "icon": "😂"},
-    {"id": 15, "title": "Compliment Yourself", "desc": "Write a genuine compliment to yourself.", "icon": "🪞"},
-    {"id": 16, "title": "Draw Your Emotion", "desc": "Use emoji or words to express your mood.", "icon": "🎨"},
-    {"id": 17, "title": "Family Reflection", "desc": "Share one positive family interaction.", "icon": "👨‍👩‍👦"},
-    {"id": 18, "title": "Teacher Thanks", "desc": "Thank a teacher or mentor in writing.", "icon": "🍎"},
-    {"id": 19, "title": "Hobby Time", "desc": "What did you do just for fun today?", "icon": "🏓"},
-    {"id": 20, "title": "Mini Meditation", "desc": "Take 2 minutes to breathe and reflect.", "icon": "🧘"},
-    {"id": 21, "title": "Quick Brain Teaser", "desc": "Solve a logic or puzzle question.", "icon": "🧩"},
-    {"id": 22, "title": "Word Scramble", "desc": "Unscramble a positive word of the day.", "icon": "🔄"},
-    {"id": 23, "title": "Picture This!", "desc": "Upload (or describe) a photo that makes you smile.", "icon": "📷"},
-    {"id": 24, "title": "Meaningful Quote", "desc": "Share a quote that resonates with you.", "icon": "💬"},
-    {"id": 25, "title": "My Role Model", "desc": "Who inspires you and why?", "icon": "🕴️"},
-    {"id": 26, "title": "Superpower Imagination", "desc": "Invent your own superpower and explain it.", "icon": "🦸‍♂️"},
-    {"id": 27, "title": "Three-Word Self", "desc": "Describe yourself in as few words as possible.", "icon": "📝"},
-    {"id": 28, "title": "Something New", "desc": "Did you try anything new today?", "icon": "✨"},
-    {"id": 29, "title": "Kind Thought", "desc": "Share a kind thought for someone else.", "icon": "💭"},
-    {"id": 30, "title": "Doodle Pad", "desc": "Draw something that represents your mood.", "icon": "🖌️"},
-    {"id": 31, "title": "Friend Check-in", "desc": "Send a message to a friend and reflect on their reply.", "icon": "📱"},
-    {"id": 32, "title": "Gratitude Photo", "desc": "Upload a photo of something you're grateful for.", "icon": "📷"},
-    {"id": 33, "title": "Describe a Dream", "desc": "Recall the most recent dream you remember.", "icon": "🌙"},
-    {"id": 34, "title": "Advice to Younger You", "desc": "What would you tell your 8-year-old self?", "icon": "👶"},
-    {"id": 35, "title": "One Small Win", "desc": "Something you did well today, no matter how small.", "icon": "👏"},
-    {"id": 36, "title": "Emotion Wheel", "desc": "Pick today’s main feeling from a wheel of emotions.", "icon": "🌀"},
-    {"id": 37, "title": "Quick Survey", "desc": "Rank your sleep, nutrition, exercise (1–5)", "icon": "☑️"},
-    {"id": 38, "title": "Picture Poem", "desc": "Write a quick poem about how you feel.", "icon": "🖋️"},
-    {"id": 39, "title": "Future Vision", "desc": "Describe your ideal day 5 years from now.", "icon": "🔮"},
-    {"id": 40, "title": "Peer Compliment", "desc": "Say something nice to a classmate.", "icon": "🏅"},
-    {"id": 41, "title": "PERMA Profiler", "desc": "How much do you experience positivity, engagement, relationships, meaning, achievement?", "icon": "📈"},
-    {"id": 42, "title": "Growth Mindset", "desc": "Describe a way you learned from a setback.", "icon": "📚"},
-    {"id": 43, "title": "Motivation Meter", "desc": "Rate your motivation today (1–10) and why.", "icon": "🕹️"},
-    {"id": 44, "title": "Strengths List", "desc": "Write three of your personal strengths.", "icon": "💪"},
-    {"id": 45, "title": "Best Recent Habit", "desc": "What healthy habit did you practice today?", "icon": "🍎"},
-    {"id": 46, "title": "Belief Update", "desc": "Write about changing a belief or opinion recently.", "icon": "🔁"},
-    {"id": 47, "title": "Values Ranking", "desc": "What’s most important: Honesty, Kindness, or Ambition?", "icon": "🔢"},
-    {"id": 48, "title": "Goal Progress", "desc": "What step did you take toward a current goal?", "icon": "🚀"},
-    {"id": 49, "title": "Mini Habit Tracker", "desc": "Did you drink enough water today?", "icon": "💧"},
-    {"id": 50, "title": "Stress Relief Strategy", "desc": "How did you unwind or relax today?", "icon": "🚿"},
-    {"id": 51, "title": "Best Friend Story", "desc": "Share a memory with your closest friend.", "icon": "👫"},
-    {"id": 52, "title": "Artist for a Day", "desc": "Draw or describe something creative you made.", "icon": "🎭"},
-    {"id": 53, "title": "Positive Message Board", "desc": "Leave a kind note for others to see.", "icon": "📢"},
-    {"id": 54, "title": "Energy Level", "desc": "How much energy do you have right now? Why?", "icon": "⚡"},
-    {"id": 55, "title": "Kindness Wheel", "desc": "Spin for a random way to be kind today.", "icon": "🎡"},
-    {"id": 56, "title": "Nature Pause", "desc": "Spend 3 minutes outside and reflect.", "icon": "🌳"},
-    {"id": 57, "title": "Micro-Story", "desc": "Write your day as a 6-word story.", "icon": "📖"},
-    {"id": 58, "title": "Purpose Check", "desc": "What makes you feel most alive?", "icon": "🌈"},
-    {"id": 59, "title": "Mini Quiz: Who Inspires You?", "desc": "Choose a role model and explain why.", "icon": "🗣️"},
-    {"id": 60, "title": "Today’s Lesson", "desc": "What did you learn today?", "icon": "📗"},
-    {"id": 61, "title": "Dream Job Reflection", "desc": "What’s your dream career? Why?", "icon": "💼"},
-    {"id": 62, "title": "Mood Calendar", "desc": "What color would you give today?", "icon": "🗓️"},
-    {"id": 63, "title": "Playlist Maker", "desc": "List three songs for your mood.", "icon": "🎶"},
-    {"id": 64, "title": "Describe a Place You Love", "desc": "What space helps you feel calm?", "icon": "🏞️"},
-    {"id": 65, "title": "Mini Logic Puzzle", "desc": "Answer a quick riddle!", "icon": "🧠"},
-    {"id": 66, "title": "Daily Affirmation Picker", "desc": "Choose or write today’s affirmation.", "icon": "💫"},
-    {"id": 67, "title": "Body Scan", "desc": "Notice and write about physical sensations.", "icon": "🦶"},
-    {"id": 68, "title": "Surprise Challenge", "desc": "Do something unexpected for yourself or another.", "icon": "🎁"},
-    {"id": 69, "title": "Social Butterfly", "desc": "How did you connect with others today?", "icon": "🦋"},
-    {"id": 70, "title": "Appreciation Post", "desc": "Recognize something or someone you appreciate.", "icon": "🎉"},
-    {"id": 71, "title": "Describe a Problem", "desc": "What’s one challenge you’d like advice on?", "icon": "🔍"},
-    {"id": 72, "title": "Energy Booster", "desc": "What gives you an instant energy boost?", "icon": "💥"},
-    {"id": 73, "title": "Funny Memory", "desc": "Share something that made you laugh recently.", "icon": "🤣"},
-    {"id": 74, "title": "Today’s Inspiration", "desc": "Quote or lesson that inspired you.", "icon": "🌠"},
-    {"id": 75, "title": "Digital Declutter", "desc": "Did you tidy up your device or workspace?", "icon": "🧹"},
-    {"id": 76, "title": "Check on a Friend", "desc": "Reach out to check in on someone.", "icon": "📞"},
-    {"id": 77, "title": "Gratitude Letter", "desc": "Write a thank-you note to someone who helped you.", "icon": "✍️"},
-    {"id": 78, "title": "Micro-Habit", "desc": "What small healthy habit did you practice?", "icon": "🦶"},
-    {"id": 79, "title": "Sunshine Soak", "desc": "Spend a moment in sunshine and write your thoughts.", "icon": "☀️"},
-    {"id": 80, "title": "Describe Your Safe Space", "desc": "Where do you feel most secure or at peace?", "icon": "🏡"},
-    {"id": 81, "title": "Cheer Up a Peer", "desc": "Send an encouraging message to a friend.", "icon": "👋"},
-    {"id": 82, "title": "Motivational Image", "desc": "Find or draw a motivational image.", "icon": "🖼️"},
-    {"id": 83, "title": "Play a Short Game", "desc": "Solve a mini game or riddle here!", "icon": "🎲"},
-    {"id": 84, "title": "Who Do You Admire?", "desc": "Name a person you admire and explain why.", "icon": "⭐"},
-    {"id": 85, "title": "Grit & Perseverance", "desc": "Share a time you kept going despite difficulty.", "icon": "🚴"},
-    {"id": 86, "title": "Breathe and Notice", "desc": "Take 5 slow breaths, then describe how you feel.", "icon": "🌬️"},
-    {"id": 87, "title": "What Are You Curious About?", "desc": "Describe something you want to learn or try.", "icon": "❓"},
-    {"id": 88, "title": "List Your Favorites", "desc": "Book, movie, and meal you love best!", "icon": "🥇"},
-    {"id": 89, "title": "Ideal Day", "desc": "Describe what would make today ideal for you.", "icon": "🎈"},
-    {"id": 90, "title": "Mini Bucket List", "desc": "List three things you want to try this year.", "icon": "📝"},
-    {"id": 91, "title": "Mood Check-Out", "desc": "How do you feel after today's activities?", "icon": "😌"},
-    {"id": 92, "title": "Describe a Surprise", "desc": "Share a recent pleasant surprise.", "icon": "🎊"},
-    {"id": 93, "title": "Self-Reflection Moment", "desc": "What have you learned about yourself recently?", "icon": "👤"},
-    {"id": 94, "title": "Offer Someone Help", "desc": "How did you help someone else today?", "icon": "🤲"},
-    {"id": 95, "title": "Share a Short Story", "desc": "Write a mini story about a real or imagined event.", "icon": "📘"},
-    {"id": 96, "title": "Daily Intention", "desc": "What’s your main intention for tomorrow?", "icon": "📅"},
-    {"id": 97, "title": "Your Best Trait", "desc": "What personal trait are you proudest of?", "icon": "💖"},
-    {"id": 98, "desc": "Sit in silence and write your first thought after.", "icon": "🤫"},
-    {"id": 99, "title": "Shoutout Someone", "desc": "Give a shoutout to a peer or teacher.", "icon": "📣"},
-    {"id": 100, "title": "Virtual Garden", "desc": "Imagine growing a quality (like resilience or kindness). Write how you’ll nurture it!", "icon": "🌿"},
-]
-import random
-# Extend to 100 if not done manually:
-for i in range(len(GROWTH_ACTIVITIES) + 1, 101):
-    GROWTH_ACTIVITIES.append(
-        {"id": i, "title": f"Reflection Prompt #{i}", "desc": f"", "icon": "📝"}
-    )
-
-from bson.objectid import ObjectId
-from flask import redirect, request, url_for, flash
-
-@app.route('/teacher/delete_growth_response/<response_id>', methods=["POST"])
-@teacher_required
-def delete_growth_response(response_id):
-    try:
-        mongo.db.growth_responses.delete_one({ "_id": ObjectId(response_id) })
-        flash("✅ Reflection successfully deleted.", "success")
-    except Exception as e:
-        flash("❌ Failed to delete reflection.", "danger")
-        print(f"Delete error: {e}")
-    return redirect(url_for('view_growthhub_reflections'))
+# --- Authentication ---
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -295,84 +229,21 @@ def login():
                 {"student_id": form.email_or_sid.data.upper()}
             ]
         })
-        print(f"--- Login Attempt for: {form.email_or_sid.data} ---")
-        print(f"User Document from DB: {user_doc}")
-        
         if user_doc and check_pw(form.password.data, user_doc.get("pw_hash", "")):
             login_user(User(user_doc))
-            print(f"Login successful! User role from DB: {user_doc['role']}")
-            print(f"Current_user after login_user: {current_user.is_authenticated}, Role: {current_user.role}")
-            
-            flash("Welcome !", "success")
-            return redirect(url_for("student_dashboard")) 
-        
+            flash("Welcome!", "success")
+            if user_doc["role"] == "teacher":
+                return redirect(url_for("teacher_dashboard"))
+            else:
+                return redirect(url_for("student_dashboard"))
         flash("Invalid credentials.", "danger")
-        print(f"Login Failed for: {form.email_or_sid.data}")
     return render_template("login.html", form=form)
-
-@app.route("/growth_menu")
-@login_required
-def growth_menu():
-    # Allow both students and teachers to access Growth Hub
-    responses = mongo.db.growth_responses.find({"student_id": current_user.student_id})
-    completed_ids = {r["question_id"] for r in responses}
-
-    activities = []
-    for activity in GROWTH_ACTIVITIES:
-        item = activity.copy()
-        item["done"] = item["id"] in completed_ids
-        activities.append(item)
-
-    return render_template("growth_menu.html", activities=activities)
-
-
-@app.route("/growth/<int:qid>", methods=["GET", "POST"])
-@login_required
-def growth_question(qid):
-    if not (1 <= qid <= len(GROWTH_ACTIVITIES)):
-        abort(404)
-
-    activity = GROWTH_ACTIVITIES[qid - 1]
-
-    if request.method == "POST":
-        answer = request.form.get("answer", "").strip()
-        if answer:
-            mongo.db.growth_responses.insert_one({
-                "student_id": current_user.student_id,
-                "name": current_user.name,
-                "question_id": qid,
-                "question": activity["title"],
-                "answer": answer,
-                "submitted_at": datetime.utcnow()
-            })
-            flash("✅ Reflection saved!", "success")
-            return redirect(url_for("growth_menu"))
-        else:
-            flash("Please write your answer before submitting.", "warning")
-
-    return render_template("growth_question.html", qid=qid, activity=activity)
-
-@app.route("/growth/random")
-@login_required
-def growth_random():
-    import random
-    qid = random.randint(1, len(GROWTH_ACTIVITIES))
-    return redirect(url_for("growth_question", qid=qid))
-
-@app.route("/teacher/growth_reflections")
-@teacher_required
-def view_growthhub_reflections():
-    growth_responses = list(
-        mongo.db.growth_responses.find().sort("submitted_at", -1)
-    )
-    return render_template("growthhub_table.html", growth_responses=growth_responses)
-
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('student_dashboard'))
+    return redirect(url_for('startpage'))
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -387,178 +258,121 @@ def register():
         if exists:
             flash("Account already exists", "warning")
         else:
-            try:
-                mongo.db.users.insert_one({
-                    "role": "student",
-                    "student_id": form.student_id.data.upper(),
-                    "name": form.name.data,
-                    "email": form.email.data.lower(),
-                    "phone": form.phone.data,
-                    "pw_hash": hash_pw(form.password.data),
-                    "created_at": datetime.now(timezone.utc),
-                })
-                print(f"Successfully registered new user: {form.email.data}")
-                flash("Account created—please sign in", "success")
-                return redirect(url_for("login"))
-            except Exception as e:
-                print(f"Error during user registration: {e}")
-                flash("An error occurred during registration. Please try again.", "danger")
+            mongo.db.users.insert_one({
+                "role": "student",
+                "student_id": form.student_id.data.upper(),
+                "name": form.name.data,
+                "email": form.email.data.lower(),
+                "phone": form.phone.data,
+                "pw_hash": hash_pw(form.password.data),
+                "created_at": datetime.utcnow(),
+            })
+            flash("Account created—please sign in", "success")
+            return redirect(url_for("login"))
     return render_template("register.html", form=form)
 
 
-# --- Student & Public Routes ---
+# --- Student Routes ---
+
 @app.route("/jobs")
 def job_list():
     jobs = list(mongo.db.jobs.find({"status": "open"}))
-    applied_ids = set()
-    if current_user.is_authenticated and current_user.role == 'student':
-        student_applications = mongo.db.applications.find({"user_id": ObjectId(current_user.id)})
-        applied_ids = {app["job_id"] for app in student_applications}
-
-    return render_template("job_list.html", jobs=jobs, applied_ids=applied_ids)
-
-@app.route('/job/<job_id>')
-def job_detail(job_id):
-    job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
-    if not job:
-        flash("Job not found", "danger")
-        return redirect(url_for('student_dashboard'))
-    return render_template("job_detail.html", job=job)
-
-
-
+    return render_template("job_list.html", jobs=jobs)
 @app.route('/resources')
 def resources():
     return render_template('resources.html')
-
 @app.route('/advice')
 def advice():
     return render_template("advice.html")
+import os
+from flask import request, redirect, url_for, flash, current_app
+from flask_login import login_required, current_user
+from bson import ObjectId
+from werkzeug.utils import secure_filename
+from flask_mail import Message
 
 @app.route("/upload_resume/<job_id>", methods=["POST"])
 @login_required
 def upload_resume(job_id):
-    resume_file = request.files.get("resume")
-    photo_file = request.files.get("photo")
-
-    if not resume_file or not photo_file or not resume_file.filename.strip() or not photo_file.filename.strip():
-        flash("Please upload both resume and photo.", "warning")
-        return redirect(url_for("student_dashboard"))
-
-    application = mongo.db.applications.find_one({
-        "student_id": current_user.student_id,
-        "job_id": ObjectId(job_id)
-    })
-
-    if not application:
-        flash("No matching application found. Please apply first.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    if application.get("status") not in ["pending_resume", "corrections_needed"]:
-        flash("This application cannot be modified right now.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    # Save files
-    filename_resume = secure_filename(resume_file.filename)
-    filename_photo = secure_filename(photo_file.filename)
-    resume_folder = os.path.join(current_app.root_path, "uploads", "resumes")
-    photo_folder = os.path.join(current_app.root_path, "uploads", "photos")
-    os.makedirs(resume_folder, exist_ok=True)
-    os.makedirs(photo_folder, exist_ok=True)
-
-    resume_path = os.path.join(resume_folder, filename_resume)
-    photo_path = os.path.join(photo_folder, filename_photo)
-    resume_file.save(resume_path)
-    photo_file.save(photo_path)
-
-    mongo.db.applications.update_one(
-        {"_id": application["_id"]},
-        {"$set": {
-                "status": "submitted",
-                "resume_uploaded_at": datetime.utcnow(),
-                "resume_filename": filename_resume,
-                "photo_filename": filename_photo
-            }
-        }
-    )
-
-    job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
-    job_title = job.get("title", "Untitled Job")
-
-    try:
-        smtp.send_confirmation_mail(current_user.email, current_user.name, application["_id"], job_title)
-        flash("✅ Resume submitted and confirmation email sent.", "success")
-    except Exception as e: # Catch specific exception for better debugging
-        flash("Resume saved, but email failed to send.", "warning")
-        print(f"Error sending confirmation email: {e}") # Log the error
-
-    return redirect(url_for("student_dashboard"))
-
-@app.route("/reupload_application/<app_id>")
-@login_required
-def reupload_application(app_id):
     if current_user.role != "student":
         flash("Unauthorized access.", "danger")
-        return redirect(url_for("teacher_dashboard"))
+        return redirect(url_for('startpage'))
+    
+    file = request.files.get('resume')
+    if not file or file.filename == '':
+        flash("No resume selected.", "warning")
+        return redirect(url_for('student_dashboard'))
 
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
-        flash("Application not found or access denied.", "danger")
-        return redirect(url_for("student_dashboard"))
+    # Validate file type - allow PDF or Word Documents
+    # You can improve with filetype==1.2.0 or filename checks
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.pdf', '.doc', '.docx']:
+        flash("Allowed file types are PDF, DOC, DOCX.", "warning")
+        return redirect(url_for('student_dashboard'))
 
-    if app_doc.get("status") != "corrections_needed":
-        flash("Re-upload is not currently required for this application.", "warning")
-        return redirect(url_for("student_dashboard"))
+    # Secure filename to avoid path injection
+    filename = secure_filename(f"{current_user.student_id}_{job_id}{ext}")
+    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    
+    # Save file
+    file.save(upload_path)
 
-    job = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    job_title = job.get("title", "Job Application")
-
-    # This renders the new form, passing necessary data
-    return render_template(
-        "reupload_form.html",
-        app_id=str(app_doc["_id"]),
-        job_title=job_title,
-        feedback=app_doc.get("teacher_feedback", "No specific feedback provided.")
+    # Update application in DB
+    mongo.db.applications.update_one(
+        {"user_id": ObjectId(current_user.id), "job_id": ObjectId(job_id)},
+        {
+            "$set": {
+                "resume_filename": filename,
+                "status": "submitted",
+                "resume_uploaded_at": datetime.utcnow()
+            }
+        },
+        upsert=True
     )
 
-# --- NEW ROUTE 2: Handles Submission from the New Form ---
-@app.route("/submit_reupload/<app_id>", methods=["POST"])
-@login_required
-def submit_reupload(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
-        flash("Unauthorized re-upload attempt.", "danger")
-        return redirect(url_for("student_dashboard"))
-    
-    if app_doc.get("status") != "corrections_needed":
-        flash("This application does not require corrections at this time.", "warning")
-        return redirect(url_for("student_dashboard"))
+    # Send notification email with the resume attached
+    job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
+    faculty_email = job.get('posted_by_email', 'psychologyresumemail@gmail.com')
 
-    # Reuses the existing file handling logic (which automatically handles email sending)
-    # handle_resume_submission updates status to 'submitted' and sends confirmation mail
-    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
+    msg = Message(
+        subject=f"New Resume Uploaded for '{job['title']}'",
+        sender=current_app.config['MAIL_USERNAME'],
+        recipients=[faculty_email]
+    )
+    msg.body = f"Student {current_user.name or current_user.email} has uploaded a resume for job '{job['title']}'."
 
-#### B. Modify `student_dashboard` Loop Logic (Button Link)
+    with open(upload_path, 'rb') as fp:
+        msg.attach(filename, "application/octet-stream", fp.read())
+
+    try:
+        mail.send(msg)
+        flash("Resume uploaded and emailed successfully.", "success")
+    except Exception as e:
+        flash(f"Resume uploaded but email sending failed: {e}", "warning")
+
+    return redirect(url_for('student_dashboard'))
 
 
-@app.route("/guidelines")
-def guidelines():
-    return render_template("guidelines_modal.html")
+from datetime import datetime
+import pytz
+from bson.objectid import ObjectId
+from flask import render_template, redirect, url_for, flash
+from flask_login import current_user, login_required
 
-# In app.py, replace the entire student_dashboard function with this:
-# In app.py, replace the entire student_dashboard function with this:
+IST = pytz.timezone('Asia/Kolkata')
+
+from datetime import datetime
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
+
 @app.route("/student/")
 @login_required
 def student_dashboard():
-    # --- FIX 1: Set SERVER_NAME if not explicitly set in environment ---
-    # This ensures asynchronous url_for() calls (used in email) work, 
-    # as gunicorn needs a domain name.
-    if not app.config.get('SERVER_NAME'):
-        app.config['SERVER_NAME'] = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '127.0.0.1:10000')
-
     if current_user.role != "student":
         return redirect(url_for("teacher_dashboard"))
 
+    # 1. Get student applications and enrich with job info
     pipeline = [
         {"$match": {"user_id": ObjectId(current_user.id)}},
         {"$lookup": {
@@ -572,44 +386,33 @@ def student_dashboard():
     ]
     apps = list(mongo.db.applications.aggregate(pipeline))
 
+    # 2. Get open jobs
     jobs = list(mongo.db.jobs.find({"status": "open"}).sort("created_at", -1))
 
-    applied_ids = set()
-    if current_user.is_authenticated and current_user.role == 'student':
-        student_applications = mongo.db.applications.find({"user_id": ObjectId(current_user.id)})
-        applied_ids = {app["job_id"] for app in student_applications}
-
+    # 3. Determine applied jobs
+    applied_ids = {app["job_id"] for app in apps}
     has_active_application = any(
-        app.get("status") in ("pending_resume", "submitted", "approved") for app in apps
+        app.get("status") in ("pending_resume", "submitted") for app in apps
     )
 
-    now_ist = datetime.now(IST)
+    # 4. Enhance each app object
+    now = datetime.now(IST)
     for app in apps:
+        # Descriptive message
         status = app.get("status", "")
-        app["is_reupload_allowed"] = False
-        app["reupload_deadline_ist"] = "N/A" # Simplified
-        app["reupload_remaining_time"] = "N/A" # Simplified
-        
         if status == "approved":
             app["status_message"] = "🎉 Yay! Your application is approved."
         elif status == "rejected":
-            app["status_message"] = "😞 Unfortunately, your application was rejected."
+            app["status_message"] = "😞 Your application was rejected."
         elif status == "corrections_needed":
-            app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
-            # FIX 2: Re-upload is always allowed (logic override)
-            app["is_reupload_allowed"] = True
+            app["status_message"] = "🛠️ Improvements needed – check feedback."
         else:
             app["status_message"] = ""
 
+        # Normalize resume_deadline to IST-aware
         deadline = app.get("resume_deadline")
         if deadline and deadline.tzinfo is None:
-            app["resume_deadline"] = pytz.utc.localize(deadline).astimezone(IST)
-        else:
-            app["resume_deadline"] = deadline.astimezone(IST) if deadline else None
-        
-        # --- DEBUGGING LINE ---
-        print(f"DEBUG: App ID: {app['_id']}, Status: {app.get('status')}, Is Reupload Allowed: {app['is_reupload_allowed']}")
-        # --- END DEBUGGING LINE ---
+            app["resume_deadline"] = IST.localize(deadline)
 
     return render_template(
         "student_dashboard.html",
@@ -617,71 +420,33 @@ def student_dashboard():
         jobs=jobs,
         applied_ids=applied_ids,
         has_active=has_active_application,
-        now=now_ist
+        now=now  # ✅ IST-aware datetime passed to template
     )
 
-from smtp import send_application_status_email
+from datetime import datetime, timedelta, timezone
+import pytz
+from bson.objectid import ObjectId
+from flask import flash, redirect, url_for, request
+from flask_login import current_user, login_required
 
-@app.route('/update_application_status/<int:app_id>', methods=['POST'])
-def update_application_status(app_id):
-    status = request.form['status']
-    feedback = request.form.get('feedback', '')
+IST = pytz.timezone('Asia/Kolkata')
 
-    conn = get_db_connection()
-    app_entry = conn.execute("SELECT * FROM applications WHERE id = ?", (app_id,)).fetchone()
-
-    if not app_entry:
-        conn.close()
-        flash("Application not found", "danger")
-        return redirect(url_for('assess_students'))
-
-    conn.execute("UPDATE applications SET status = ?, teacher_feedback = ? WHERE id = ?",
-                 (status, feedback, app_id))
-    conn.commit()
-    conn.close()
-
-    send_application_status_email(
-    recipient=app_entry['student_email'],
-    student_name=app_entry['student_name'],
-    job_title=app_entry['job_title'],
-    status=status,
-    feedback=feedback
-)
-
-
-    flash("Application status updated and student notified via email.", "success")
-    return redirect(url_for('assess_students'))
-
-
-# In app.py, replace the resume_reupload function with this:
-@app.route("/resume/reupload/<app_id>", methods=["POST"])
-@login_required
-def resume_reupload(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-
-    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
-        flash("Unauthorized re-upload attempt.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    # The time-based check is no longer needed
-    if app_doc.get("status") != "corrections_needed":
-        flash("You can only re-upload when corrections are requested.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
 @app.route("/apply/<job_id>", methods=["POST"])
 @login_required
 def apply(job_id):
+    # Only students can apply
     if current_user.role != "student":
         flash("Only students can apply for jobs.", "danger")
-        return redirect(url_for("startpage"))
+        return redirect(url_for("index"))
 
+    # Validate job_id is a valid ObjectId
     try:
         job_obj_id = ObjectId(job_id)
     except Exception:
         flash("Invalid job ID.", "danger")
         return redirect(url_for("student_dashboard"))
 
+    # Check if student has active application
     active_statuses = ["pending_resume", "submitted", "approved"]
     existing_application = mongo.db.applications.find_one({
         "user_id": ObjectId(current_user.id),
@@ -692,31 +457,39 @@ def apply(job_id):
         flash("You already have an active application. You can only apply for one job at a time.", "warning")
         return redirect(url_for("student_dashboard"))
 
+    # Check job exists and is open
     job = mongo.db.jobs.find_one({"_id": job_obj_id, "status": "open"})
     if not job:
         flash("This job is no longer available.", "danger")
         return redirect(url_for("student_dashboard"))
 
+    # Check vacancies left
     applications_count = mongo.db.applications.count_documents({
         "job_id": job_obj_id,
-        "status": {"$in": ["active_statuses"]}
+        "status": {"$in": active_statuses}
     })
 
     if applications_count >= job.get("vacancies", 0):
         flash("Sorry, no vacancies are available for this job.", "danger")
         return redirect(url_for("student_dashboard"))
 
-    now_utc = datetime.now(timezone.utc)
-    deadline_utc = now_utc + timedelta(hours=48)
+    # Calculate times in IST and convert to UTC naive for storage
+    
+    now_ist = datetime.now(IST)
+    deadline_ist = now_ist + timedelta(hours=48)
+    applied_at_utc = now_ist
+    deadline_utc = deadline_ist
 
+    # Insert the application
     mongo.db.applications.insert_one({
         "job_id": job_obj_id,
         "user_id": ObjectId(current_user.id),
-        "applied_at": now_utc,
+        "applied_at": applied_at_utc,
         "resume_deadline": deadline_utc,
         "status": "pending_resume",
     })
 
+    # Decrement vacancies atomically, avoid negatives
     mongo.db.jobs.update_one(
         {"_id": job_obj_id, "vacancies": {"$gt": 0}},
         {"$inc": {"vacancies": -1}}
@@ -729,303 +502,135 @@ def apply(job_id):
 @app.route("/upload/<app_id>", methods=["POST"])
 @login_required
 def upload(app_id):
-    # 📌 1. Verify application ownership
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc or app_doc.get("user_id") != ObjectId(current_user.id):
-        flash("Unauthorized access.", "danger")
+    doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if (not doc) or doc["user_id"] != ObjectId(current_user.id):
+        return redirect(url_for("student_dashboard"))
+    if datetime.now() > doc["resume_deadline"]:
+        flash("Upload window closed", "danger")
         return redirect(url_for("student_dashboard"))
 
-    if app_doc.get("status") not in ["pending_resume", "corrections_needed"]:
-        flash("This application cannot be modified.", "danger")
+    f = request.files.get("resume")
+    if not f:
+        flash("No file selected", "warning")
         return redirect(url_for("student_dashboard"))
-
-    # 📌 2. Get uploaded files
-    resume = request.files.get("resume")
-    photo = request.files.get("photo")
-    if not resume or not photo or not resume.filename.strip() or not photo.filename.strip():
-        flash("Please upload both résumé and photo.", "warning")
+    if magic.from_buffer(f.read(1024), mime=True) != "application/pdf":
+        flash("File must be PDF", "warning")
         return redirect(url_for("student_dashboard"))
+    f.seek(0)
+    fname = secure_filename(f"{current_user.student_id}_{app_id}.pdf")
+    f.save(os.path.join(app.config["UPLOAD_FOLDER"], fname))
 
-    # 📌 3. Validate file types and extensions
-    allowed_resume = {".pdf", ".doc", ".docx"}
-    allowed_photo = {".jpg", ".jpeg", ".png"}
-
-    resume_ext = os.path.splitext(resume.filename)[1].lower()
-    photo_ext = os.path.splitext(photo.filename)[1].lower()
-
-    if resume_ext not in allowed_resume:
-        flash("Résumé must be a PDF or Word file.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    if photo_ext not in allowed_photo:
-        flash("Photo must be JPG or PNG.", "danger")
-        return redirect(url_for("student_dashboard"))
-
-    # 📌 4. Generate secure filenames
-    basename = f"{current_user.student_id}_{app_id}"
-    resume_filename = secure_filename(f"{basename}{resume_ext}")
-    photo_filename = secure_filename(f"{basename}_photo{photo_ext}")
-
-    upload_dir = app.config.get("UPLOAD_FOLDER", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-
-    resume_path = os.path.join(upload_dir, resume_filename)
-    photo_path = os.path.join(upload_dir, photo_filename)
-
-    # 📌 5. Save files
-    resume.save(resume_path)
-    photo.save(photo_path)
-
-    # 📌 6. Update application in DB
     mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": {
-                "resume_filename": resume_filename,
-                "photo_filename": photo_filename,
-                "resume_uploaded_at": datetime.now(timezone.utc),
+        {"_id": doc["_id"]},
+        {
+            "$set": {
+                "resume_filename": fname,
                 "status": "submitted",
-                "teacher_feedback": ""  # optional: clear feedback upon resubmission
+                "resume_uploaded_at": datetime.utcnow()  # <-- Add timestamp here
             }
         }
     )
 
-    # 📌 7. Send confirmation and admin emails
-    job = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    job_title = job.get("title", "Untitled Job")
-
-    # 📨 Send résumé & photo as attachments to admin
-    try:
-        smtp.send_resume_and_photo_mail(
-            resume_filename, photo_filename,
-            current_user.email, job_title
-        )
-    except Exception as e:
-        print("Admin mail error:", e)
-        flash("Upload successful, but admin could not be notified.", "warning")
-
-    # ✅ Send confirmation email to student
-    try:
-        smtp.send_confirmation_mail(
-            applicant_email=current_user.email,
-            applicant_name=current_user.name,
-            application_id=str(app_doc["_id"]),
-            job_title=job_title
-        )
-        flash("Résumé and photo uploaded and confirmation email sent!", "success")
-    except Exception as e:
-        print("Student mail error:", e)
-        flash("Upload successful, but confirmation email failed.", "warning")
-        
+    send_resume_mail(fname, current_user.email)
+    flash("Résumé uploaded", "success")
     return redirect(url_for("student_dashboard"))
 
-# Moved handle_resume_submission outside of the route
-def handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True):
-    resume = request.files.get("resume")
-    photo = request.files.get("photo")
-
-    if not resume or not photo or not resume.filename.strip() or not photo.filename.strip():
-        flash("Please upload both résumé and photo.", "warning")
-        return redirect(url_for("student_dashboard"))
-
-    ext_resume = os.path.splitext(resume.filename)[1].lower()
-    ext_photo = os.path.splitext(photo.filename)[1].lower()
-    base = f"{current_user.student_id}_{app_doc['_id']}"
-
-    resume_filename = secure_filename(f"{base}{ext_resume}")
-    photo_filename = secure_filename(f"{base}_photo{ext_photo}")
-
-    upload_dir = app.config.get("UPLOAD_FOLDER", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    resume_path = os.path.join(upload_dir, resume_filename)
-    photo_path = os.path.join(upload_dir, photo_filename)
-    
-    resume.save(resume_path)
-    photo.save(photo_path)
-
-    update_fields = {
-        "resume_filename": resume_filename,
-        "photo_filename": photo_filename,
-        "resume_uploaded_at": datetime.now(timezone.utc),
-        "status": new_status,
-    }
-
-    if clear_feedback:
-        update_fields["teacher_feedback"] = ""
-
-    mongo.db.applications.update_one(
-        {"_id": app_doc["_id"]}, {"$set": update_fields}
-    )
-
-    job = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    job_title = job.get("title", "Job")
-
-    try:
-        smtp.send_confirmation_mail(
-            applicant_email=current_user.email,
-            applicant_name=current_user.name,
-            application_id=str(app_doc["_id"]),
-            job_title=job_title
-        )
-        flash("✅ Résumé submitted and confirmation email sent.", "success")
-    except Exception as e:
-        print("Email error:", e)
-        flash("Upload succeeded, but email failed.", "warning")
-
-    try:
-        smtp.send_admin_notification(current_user.name, job_title, current_user.email)
-    except Exception as e:
-        print("Admin email error:", e)
-
-    return redirect(url_for("student_dashboard"))
-
-
-    # New: Check if the 24-hour re-upload window has expired
-    corrections_at = app_doc.get("corrections_at")
-    if corrections_at:
-        deadline = corrections_at + timedelta(hours=24)
-        if datetime.now(timezone.utc) > deadline:
-            flash("The 24-hour re-upload window has expired.", "danger")
-            # Optional: automatically set status to rejected_auto
-            mongo.db.applications.update_one(
-                {"_id": ObjectId(app_doc["_id"])},
-                {"$set": {"status": "rejected_auto"}}
-            )
-            return redirect(url_for("student_dashboard"))
-
-    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
-
-# In app.py, add this new route
-@app.route("/teacher/reassign_reupload_time/<app_id>", methods=["POST"])
-@teacher_required
-def reassign_reupload_time(app_id):
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc:
-        flash("Application not found.", "danger")
-        return redirect(url_for("assess_students"))
-
-    if app_doc.get("status") != "corrections_needed":
-        flash("Can only re-assign time for applications needing corrections.", "danger")
-        return redirect(url_for("assess_students"))
-
-    new_timestamp = datetime.now(timezone.utc)
-    mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": {"corrections_at": new_timestamp}}
-    )
-
-    # Send a notification email to the student about the new deadline
-    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
-    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    if student_doc and job_doc:
-        # We can reuse the same email function, but with a different message if you wish.
-        # Here we just re-send the 'corrections_needed' email.
-        scheduler.add_job(
-            func=send_application_status_email,
-            trigger='date',
-            run_date=datetime.now() + timedelta(seconds=1),
-            args=[
-                student_doc["email"],
-                student_doc["name"],
-                "needs_corrections",
-                job_doc["title"],
-                app_doc.get("teacher_feedback", "")
-            ]
-        )
-
-    flash("Re-upload window has been reset for the student.", "success")
-    return redirect(url_for("assess_students"))
 # --- Teacher Routes ---
 @app.route("/teacher/")
-@teacher_required
+@login_required
 def teacher_dashboard():
-    import math
-    from collections import defaultdict
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
 
-    # 1️⃣ Pagination settings
     page = int(request.args.get("page", 1))
-    per_page = 12
+    per_page = 10
     skip = (page - 1) * per_page
 
-    # 2️⃣ Fetch students and total pages
-    students_cursor = mongo.db.users.find({"role": "student"}).sort("name", 1).skip(skip).limit(per_page)
-    students = list(students_cursor)
     students_total = mongo.db.users.count_documents({"role": "student"})
-    total_pages = math.ceil(students_total / per_page)
+    students_cursor = (
+        mongo.db.users.find({"role": "student"})
+        .sort("name", 1)
+        .skip(skip)
+        .limit(per_page)
+    )
+    students = list(students_cursor)
+    total_pages = (students_total + per_page - 1) // per_page
 
-    # 3️⃣ Jobs and applications
     jobs = list(mongo.db.jobs.find().sort("created_at", -1))
-    active_app_count = mongo.db.applications.count_documents({"status": "submitted"})
-    pending_app_count = mongo.db.applications.count_documents({"status": "pending_resume"})
+
+    active_statuses = ["pending_resume", "submitted", "approved"]
+    pending_statuses = ["pending_resume", "corrections_needed"]
+
+    active_app_count = mongo.db.applications.count_documents({"status": {"$in": active_statuses}})
+    pending_app_count = mongo.db.applications.count_documents({"status": {"$in": pending_statuses}})
     total_applications = mongo.db.applications.count_documents({})
 
-    recent_pending_apps = list(
-        mongo.db.applications.aggregate([
-            {"$match": {"status": "pending_resume"}},
-            {"$sort": {"applied_at": -1}},
-            {"$limit": 8},
-            {"$lookup": {
-                "from": "users",
-                "localField": "user_id",
-                "foreignField": "_id",
-                "as": "user"
-            }},
-            {"$unwind": "$user"},
-            {"$lookup": {
-                "from": "jobs",
-                "localField": "job_id",
-                "foreignField": "_id",
-                "as": "job"
-            }},
-            {"$unwind": "$job"},
-        ])
-    )
+    recent_pending_apps = list(mongo.db.applications.aggregate([
+        {"$match": {"status": {"$in": pending_statuses}}},
+        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+        {"$unwind": "$user"},
+        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
+        {"$unwind": "$job"},
+        {"$sort": {"applied_at": -1}},
+        {"$limit": 10},
+    ]))
 
-    # 4️⃣ Current time in IST
-    ist = pytz.timezone("Asia/Kolkata")
-    now_ist = datetime.now(ist)
-
-    # 5️⃣ Self-Assessment Reflections
-    reflections = list(mongo.db.self_assessments.find().sort("submission_date", -1))
-
-    # 6️⃣ Growth Hub Response Stats (per student)
-    growth_responses = list(mongo.db.growth_responses.find())
-    student_hub_stats = defaultdict(lambda: {"name": "", "student_id": "", "completed": 0})
-    for entry in growth_responses:
-        sid = entry.get("student_id")
-        if sid:
-            student_hub_stats[sid]["name"] = entry.get("name", "")
-            student_hub_stats[sid]["student_id"] = sid
-            student_hub_stats[sid]["completed"] += 1
-    growth_stats = sorted(student_hub_stats.values(), key=lambda x: x["name"])
-
-    # 🔚 Finally render the dashboard
     return render_template(
         "teacher_dashboard.html",
+        jobs=jobs,
         students=students,
         students_total=students_total,
         total_pages=total_pages,
         page=page,
-        jobs=jobs,
         active_app_count=active_app_count,
         pending_app_count=pending_app_count,
         total_applications=total_applications,
         recent_pending_apps=recent_pending_apps,
-        now=now_ist,
-        reflections=reflections,       # ✅ Q1–Q5 assessments
-        growth_responses=growth_responses,  # ✅ Full growth answers
-        growth_stats=growth_stats      # ✅ Per-student completion counts
     )
 
+@app.route("/update_application/<app_id>", methods=["POST"])
+@login_required
+def update_application(app_id):
+    if current_user.role != "teacher":
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("teacher_dashboard"))
 
+    status = request.form.get("status")
+    feedback = request.form.get("feedback")  # Get feedback from form
+
+    update_data = {"$set": {"status": status}}
+    if feedback:
+        update_data["$set"]["teacher_feedback"] = feedback  # Save feedback here
+
+    mongo.db.applications.update_one({"_id": ObjectId(app_id)}, update_data)
+    flash("Application updated successfully.", "success")
+    return redirect(url_for("teacher_dashboard"))
+
+from flask import render_template, flash, redirect, url_for, request
+from flask_login import current_user, login_required
+from bson.objectid import ObjectId
+
+# New route: Page to select a job to delete
 @app.route("/select_job_to_delete")
-@teacher_required
+@login_required
 def select_job_to_delete():
-    jobs = list(mongo.db.jobs.find().sort("created_at", -1))
+    if current_user.role != "teacher":
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    # Fetch teacher's posted jobs (adjust query if jobs are not teacher-specific)
+    jobs = list(mongo.db.jobs.find().sort("created_at", -1))  # Example: all jobs; filter by teacher if needed
     return render_template("select_job_to_delete.html", jobs=jobs)
 
+# Existing/Updated delete route (handles actual deletion)
+
+
 @app.route("/teacher/job/<job_id>/applications")
-@teacher_required
+@login_required
 def job_applications(job_id):
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
     job = mongo.db.jobs.find_one({"_id": ObjectId(job_id), "created_by": ObjectId(current_user.id)})
     if not job:
         flash("Job not found or access denied.", "danger")
@@ -1039,21 +644,14 @@ def job_applications(job_id):
     ]
     applications = list(mongo.db.applications.aggregate(pipeline))
 
-    now_ist = datetime.now(IST)
-    for app in applications:
-        deadline = app.get("resume_deadline")
-        if deadline and deadline.tzinfo is None:
-            app["resume_deadline"] = pytz.utc.localize(deadline).astimezone(IST)
-        else:
-            app["resume_deadline"] = deadline.astimezone(IST) if deadline else None
-
-    return render_template("job_applications.html", job=job, applications=applications, now=now_ist)
-
+    return render_template("job_applications.html", job=job, applications=applications)
 
 @app.route("/job/new", methods=["GET", "POST"])
-@teacher_required
+@login_required
 def new_job():
     """Page for teachers to add a new job"""
+    if current_user.role != "teacher":
+        return redirect(url_for("index"))
     form = JobForm()
     if form.validate_on_submit():
         pof_name = None
@@ -1062,83 +660,68 @@ def new_job():
             form.pof.data.save(os.path.join(app.config["UPLOAD_FOLDER"], pof_name))
         mongo.db.jobs.insert_one({
             "title": form.title.data,
-            "job_description": form.job_description.data,
-            "job_specification": form.job_specification.data,
+            "description": form.description.data,
             "vacancies": form.vacancies.data,
             "pof_filename": pof_name,
             "created_by": ObjectId(current_user.id),
             "status": "open",
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.utcnow(),
         })
         flash("Job created", "success")
         return redirect(url_for("teacher_dashboard"))
     return render_template("job_form.html", form=form)
 
 
-from flask import render_template, redirect, url_for, flash, request
-from flask_login import current_user, login_required
-from bson.objectid import ObjectId
-from werkzeug.utils import secure_filename
-import os
-
 @app.route("/job/edit/<job_id>", methods=["GET", "POST"])
 @login_required
 def edit_job(job_id):
-    # Only teachers allowed
+    """Page to edit an existing job"""
     if current_user.role != "teacher":
         return redirect(url_for("index"))
 
-    # Fetch the job from the database
     job = mongo.db.jobs.find_one({"_id": ObjectId(job_id)})
     if not job:
         flash("Job not found.", "danger")
         return redirect(url_for("teacher_dashboard"))
 
-    # Instantiate the form and pre-populate with job data on GET
     form = JobForm()
     if request.method == "GET":
         form.title.data = job.get("title", "")
-        # Correctly pre-populating the new fields in the form
-        form.job_description.data = job.get("job_description", "")
-        form.job_specification.data = job.get("job_specification", "")
+        form.description.data = job.get("description", "")
         form.vacancies.data = job.get("vacancies", 6)
-        # Assuming the JobForm has a pof field, pre-populate if needed
-        # form.pof.data = job.get("pof_filename", "")
-    
-    # If the form is submitted and passes validation
+
     if form.validate_on_submit():
-        # Handle PoF file upload if present
-        pof_name = job.get("pof_filename")
         if form.pof.data and form.pof.data.filename:
             pof_name = secure_filename(form.pof.data.filename)
-            save_path = os.path.join(app.config["UPLOAD_FOLDER"], pof_name)
-            form.pof.data.save(save_path)
-        
-        # Update job in MongoDB with all fields
+            form.pof.data.save(os.path.join(app.config["UPLOAD_FOLDER"], pof_name))
+        else:
+            pof_name = job.get("pof_filename")
+
         mongo.db.jobs.update_one(
             {"_id": ObjectId(job_id)},
             {"$set": {
                 "title": form.title.data,
-                # Correctly using the form object to get the new fields
-                "job_description": form.job_description.data,
-                "job_specification": form.job_specification.data,
+                "description": form.description.data,
                 "vacancies": form.vacancies.data,
                 "pof_filename": pof_name,
             }}
         )
-        flash("Job updated successfully.", "success")
+        flash("Job updated", "success")
         return redirect(url_for("teacher_dashboard"))
-        
-    return render_template("edit_job.html", form=form, job=job)
+
+    return render_template("job_form.html", form=form)
 
 
 @app.route("/job/delete/<job_id>", methods=["POST"])
-@teacher_required
+@login_required
 def delete_job(job_id):
     """
     Deletes job from database; only accessible to teachers.
     Redirects to delete jobs listing page.
     """
+    if current_user.role != "teacher":
+        abort(403)   # Forbidden if not teacher
+
     result = mongo.db.jobs.delete_one({"_id": ObjectId(job_id)})
     if result.deleted_count:
         flash("Job deleted.", "info")
@@ -1150,336 +733,132 @@ def delete_job(job_id):
 
 @app.route("/jobs/manage")
 @app.route("/jobs/edit")
-@teacher_required
+@login_required
 def edit_jobs_list():
     """Page showing all jobs to be edited by teachers"""
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
     jobs = list(mongo.db.jobs.find().sort("created_at", -1))
     return render_template("edit_jobs_list.html", jobs=jobs)
 
 
-@app.route("/jobs/delete")
-@teacher_required
-def delete_jobs_list():
-    """Page listing all jobs with delete options for teachers"""
-    jobs = list(mongo.db.jobs.find().sort("created_at", -1))
-    return render_template("delete_jobs_list.html", jobs=jobs)
-
-
 # --- Application Status Updates by Teacher ---
 
+@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
+@login_required
+def update_application_status(app_id):
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
 
+    status = request.form.get("status")
+    feedback = request.form.get("feedback")
+    feedback = feedback.strip() if feedback else ""
 
-@app.route("/teacher/clear_application")
-@teacher_required
-def clear_application():
-    name_filter = request.args.get("name", "").strip()
-    status_filter = request.args.get("status", "").strip()
-    resume_filter = request.args.get("resume", "").strip()
-
-    pipeline = [
-        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
-        {"$unwind": "$user"},
-        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
-        {"$unwind": "$job"},
-        {"$sort": {"applied_at": -1}},
-    ]
-
-    match_filters = {}
-    if name_filter:
-        match_filters["user.name"] = {"$regex": name_filter, "$options": "i"}
-    if status_filter:
-        match_filters["status"] = status_filter
-    if resume_filter == 'uploaded':
-        match_filters["resume_filename"] = {"$exists": True, "$ne": None}
-    elif resume_filter == 'not_uploaded':
-        match_filters["resume_filename"] = {"$exists": False}
-
-    if match_filters:
-        pipeline.insert(0, {"$match": match_filters})
-
-    applications = list(mongo.db.applications.aggregate(pipeline))
-    all_statuses = ["pending_resume", "submitted", "approved", "rejected", "rejected_auto", "corrections_needed"]
-    resume_options = [
-        {"value": "", "label": "All"},
-        {"value": "uploaded", "label": "Resume Uploaded"},
-        {"value": "not_uploaded", "label": "Resume Not Uploaded"},
-    ]
-
-    return render_template(
-        "clear_application.html",
-        applications=applications,
-        name_filter=name_filter,
-        status_filter=status_filter,
-        resume_filter=resume_filter,
-        statuses=all_statuses,
-        resume_options=resume_options
-    )
-
-@app.route('/teacher/clear_application_bulk', methods=['POST'])
-@teacher_required
-def clear_application_bulk():
-    app_ids = request.form.getlist('app_ids')
-    if not app_ids:
-        flash('No applications selected.', 'warning')
-        return redirect(url_for('clear_application'))
-
-    object_ids = [ObjectId(app_id) for app_id in app_ids]
-
-    apps_to_clear = list(mongo.db.applications.find({"_id": {"$in": object_ids}}))
-    job_id_to_count = {}
-    for app_doc in apps_to_clear:
-        job_id = app_doc['job_id']
-        job_id_to_count[job_id] = job_id_to_count.get(job_id, 0) + 1
-
-    result = mongo.db.applications.delete_many({"_id": {"$in": object_ids}})
-
-    for job_id, inc_count in job_id_to_count.items():
-        mongo.db.jobs.update_one(
-            {"_id": job_id},
-            {"$inc": {"vacancies": inc_count}}
-        )
-
-    flash(f'{result.deleted_count} application(s) cleared and vacancies updated.', 'success')
-    return redirect(url_for('clear_application'))
- 
-@app.route("/teacher/assess", methods=["GET", "POST"])
-@teacher_required
-def assess_students():
-    if request.method == "POST":
-        app_id = request.form.get("app_id")
-        new_status = request.form.get("status")
-        feedback = request.form.get("feedback", "").strip()
-
-        if app_id and new_status in {"approved", "rejected", "needs_corrections"}:
-            mongo.db.applications.update_one(
-                {"_id": ObjectId(app_id)},
-                {"$set": {"status": new_status, "teacher_feedback": feedback}}
-            )
-            flash("Application updated successfully.", "success")
-        else:
-            flash("Invalid update data.", "danger")
-        return redirect(url_for("assess_students"))
-
-    name_filter = request.args.get("name", "").strip()
-    status_filter = request.args.get("status", "").strip()
-    resume_filter = request.args.get("resume", "").strip()
-
-    pipeline = [
-        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
-        {"$unwind": "$user"},
-        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
-        {"$unwind": "$job"},
-        {"$sort": {"applied_at": -1}},
-    ]
-
-    match_filters = {}
-    if name_filter:
-        match_filters["user.name"] = {"$regex": name_filter, "$options": "i"}
-    if status_filter:
-        match_filters["status"] = status_filter
-    if resume_filter == "uploaded":
-        match_filters["resume_filename"] = {"$exists": True, "$ne": None}
-    elif resume_filter == "not_uploaded":
-        match_filters["resume_filename"] = {"$exists": False}
-
-    if match_filters:
-        pipeline.insert(0, {"$match": match_filters})
-
-    applications = list(mongo.db.applications.aggregate(pipeline))
-
-    now = datetime.now(timezone.utc)
-
-    for app in applications:
-        applied_at = app.get("applied_at")
-        resume_uploaded_at = app.get("resume_uploaded_at")
-
-        if applied_at and resume_uploaded_at:
-            duration = resume_uploaded_at - applied_at
-            hours = duration.total_seconds() / 3600
-            app["upload_duration_hours"] = round(hours, 1)
-        elif applied_at and app.get("resume_filename"):
-            duration = now - applied_at
-            hours = duration.total_seconds() / 3600
-            app["upload_duration_hours"] = round(hours, 1)
-        else:
-            app["upload_duration_hours"] = None
-
-    all_statuses = [
-        "pending_resume", "submitted", "approved",
-        "rejected", "rejected_auto", "corrections_needed"
-    ]
-    resume_options = [
-        {"value": "", "label": "All"},
-        {"value": "uploaded", "label": "Resume Uploaded"},
-        {"value": "not_uploaded", "label": "Resume Not Uploaded"},
-    ]
-
-    return render_template(
-        "assess_students.html",
-        applications=applications,
-        name_filter=name_filter,
-        status_filter=status_filter,
-        resume_filter=resume_filter,
-        statuses=all_statuses,
-        resume_options=resume_options,
-    )
-
-@app.route('/teacher/delete_student_reflection/<reflection_id>', methods=["POST"])
-@teacher_required
-def delete_student_reflection(reflection_id):
-    try:
-        mongo.db.self_assessments.delete_one({"_id": ObjectId(reflection_id)})
-        flash("✅ Reflection successfully deleted.", "success")
-    except Exception as e:
-        flash("❌ Failed to delete reflection.", "danger")
-        print(f"Delete error: {e}")
-    return redirect(url_for('view_student_reflections'))
-
-@app.route("/teacher/registered_students")
-@teacher_required
-def registered_students():
-    name_filter = request.args.get("name", "").strip().lower()
-    student_id_filter = request.args.get("student_id", "").strip().lower()
-    phone_filter = request.args.get("phone", "").strip()
-    email_filter = request.args.get("email", "").strip().lower()
-
-    sort_field = request.args.get("sort", "name")
-    direction = request.args.get("direction", "asc")
-    allowed_sort_fields = {"name", "student_id", "phone", "email"}
-    sort_by = sort_field if sort_field in allowed_sort_fields else "name"
-    sort_dir = 1 if direction == "asc" else -1
-
-    query = {"role": "student"}
-    if name_filter:
-        query["name"] = {"$regex": name_filter, "$options": "i"}
-    if student_id_filter:
-        query["student_id"] = {"$regex": student_id_filter, "$options": "i"}
-    if phone_filter:
-        query["phone"] = {"$regex": phone_filter}
-    if email_filter:
-        query["email"] = {"$regex": email_filter, "$options": "i"}
-
-    students = list(mongo.db.users.find(query).sort(sort_by, sort_dir))
-
-    return render_template(
-        "registered_students.html",
-        students=students,
-        name_filter=name_filter,
-        student_id_filter=student_id_filter,
-        phone_filter=phone_filter,
-        email_filter=email_filter,
-        sort_field=sort_by,
-        direction=direction
-    )
-
-@app.route("/teacher/edit_profile", methods=["GET", "POST"])
-@teacher_required
-def edit_teacher_profile():
-    teacher = mongo.db.users.find_one({"_id": ObjectId(current_user.id)})
-    if not teacher:
-        flash("User not found", "danger")
+    if status not in {"approved", "rejected", "corrections_needed"}:
+        flash("Invalid status.", "danger")
         return redirect(url_for("teacher_dashboard"))
 
-    form = EditProfileForm()
-    if form.validate_on_submit():
-        update_dict = {
-            "name": form.name.data,
-            "email": form.email.data.lower(),
-            "phone": form.phone.data,
-        }
-        if form.password.data and form.password.data.strip():
-            update_dict["pw_hash"] = hash_pw(form.password.data)
+    mongo.db.applications.update_one(
+        {"_id": ObjectId(app_id)},
+        {"$set": {"status": status, "teacher_feedback": feedback}}
+    )
+    flash("Application updated.", "success")
+    return redirect(url_for("teacher_dashboard"))
 
-        mongo.db.users.update_one(
-            {"_id": ObjectId(current_user.id)},
-            {"$set": update_dict}
-        )
-        flash("Profile updated!", "success")
-        return redirect(url_for("teacher_dashboard"))
 
-    if request.method == "GET":
-        form.name.data = teacher.get("name", "")
-        form.email.data = teacher.get("email", "")
-        form.phone.data = teacher.get("phone", "")
+@app.route('/teacher/application/clear/<app_id>', methods=['POST'])
+@login_required
+def clear_application(app_id):
+    if current_user.role != 'teacher':
+        return redirect(url_for('student_dashboard'))
 
-    return render_template("edit_teacher_profile.html", form=form)
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc:
+        flash('Application not found.', 'warning')
+        return redirect(url_for('teacher_dashboard'))
+    
+    # Increment vacancy back only if the job is still existing
+    job_id = app_doc['job_id']
+    mongo.db.applications.delete_one({"_id": ObjectId(app_id)})
 
-# The corrected export_assessed_students function
-@app.route("/teacher/export_assessed")
-@teacher_required
-def export_assessed_students():
-    # Fetch all applications, regardless of status
-    pipeline = [
-        {
-            "$lookup": {
-                "from": "users",
-                "localField": "user_id",
-                "foreignField": "_id",
-                "as": "user"
-            }
-        },
+    # Update job's vacancy count
+    mongo.db.jobs.update_one(
+        {"_id": job_id},
+        {"$inc": {"vacancies": 1}}
+    )
+
+    flash('Application cleared and vacancy updated.', 'success')
+    return redirect(url_for('teacher_dashboard'))
+
+
+
+# --- Export Applications Data ---
+
+@app.route("/teacher/export")
+@login_required
+def export_dashboard_data():
+    """Export applications and related student/job info as Excel file"""
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
+    cursor = mongo.db.applications.aggregate([
+        {"$lookup": {
+            "from": "users",
+            "localField": "user_id",
+            "foreignField": "_id",
+            "as": "user"
+        }},
         {"$unwind": "$user"},
-        {
-            "$lookup": {
-                "from": "jobs",
-                "localField": "job_id",
-                "foreignField": "_id",
-                "as": "job"
-            }
-        },
-        {"$unwind": "$job"},
-        {"$sort": {"applied_at": -1}},
-    ]
-    results = list(mongo.db.applications.aggregate(pipeline))
+        {"$lookup": {
+            "from": "jobs",
+            "localField": "job_id",
+            "foreignField": "_id",
+            "as": "job"
+        }},
+        {"$unwind": "$job"}
+    ])
 
-    data = []
-    for app in results:
-        row = {
-            "Student Name": app["user"].get("name", ""),
-            "Student ID": app["user"].get("student_id", ""),
-            "Student Email": app["user"].get("email", ""),
-            "Job Title": app["job"].get("title", ""),
-            "Status": app.get("status", "").replace("_", " ").title(),
-            "Applied At": app.get("applied_at").strftime("%Y-%m-%d %H:%M") if app.get("applied_at") else "",
-            "Teacher Feedback": app.get("teacher_feedback") or "",
-        }
-        data.append(row)
+    records = []
+    for doc in cursor:
+        records.append({
+            "Student ID": doc["user"].get("student_id", ""),
+            "Student Name": doc["user"]["name"],
+            "Student Email": doc["user"]["email"],
+            "Job Title": doc["job"]["title"],
+            "Application Status": doc.get("status", ""),
+            "Teacher Feedback": doc.get("teacher_feedback", ""),
+            "Applied At": doc.get("applied_at", "").strftime("%Y-%m-%d %H:%M") if doc.get("applied_at") else "",
+        })
 
-    df = pd.DataFrame(data)
-
+    # Use pandas to create Excel file in-memory
+    df = pd.DataFrame(records)
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="All Applications")
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Applications")
     output.seek(0)
 
-    filename = f"All_Applications_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
     return send_file(
         output,
-        download_name=filename,  
+        download_name="applications.xlsx",
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+
 # ---------- File Serving Routes ----------
+
 @app.route("/uploads/<path:filename>")
 @login_required
 def view_resume(filename):
     """
-    Serve uploaded files.
+    Serve uploaded PDF files inline in the browser (résumés).
     """
-    upload_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    
-    try:
-        with open(upload_path, 'rb') as f:
-            kind = filetype.guess(f.read(1024))
-            mime_type = kind.mime if kind else 'application/octet-stream'
-    except Exception:
-        mime_type = 'application/octet-stream'
-    
     return send_from_directory(
         app.config["UPLOAD_FOLDER"],
         filename,
         as_attachment=False,
-        mimetype=mime_type
+        mimetype="application/pdf"
     )
 
 
@@ -1487,7 +866,7 @@ def view_resume(filename):
 @login_required
 def download_resume(filename):
     """
-    Force download of résumé files.
+    Force download of résumé PDF files.
     """
     return send_from_directory(
         app.config["UPLOAD_FOLDER"],
@@ -1495,10 +874,16 @@ def download_resume(filename):
         as_attachment=True
     )
 
+
 # ---------- Profile Editing with OTP Verification ----------
+
 @app.route("/student/edit_profile", methods=["GET", "POST"])
 @login_required
 def edit_profile():
+    """
+    Student profile editing page which supports optional password change
+    verified with OTP sent to email.
+    """
     if current_user.role != "student":
         return redirect(url_for("teacher_dashboard"))
     student = mongo.db.users.find_one({"_id": ObjectId(current_user.id)})
@@ -1506,10 +891,13 @@ def edit_profile():
         flash("User not found", "danger")
         return redirect(url_for("student_dashboard"))
     
+
     form = EditProfileForm()
+    # First phase: normal profile update or start OTP password change
     if 'awaiting_otp' not in session:
         if form.validate_on_submit():
-            if not form.password.data.strip():
+            if not form.password:
+                # Update profile fields only, no password change
                 mongo.db.users.update_one(
                     {"_id": ObjectId(current_user.id)},
                     {"$set": {
@@ -1521,6 +909,7 @@ def edit_profile():
                 flash("Profile updated!", "success")
                 return redirect(url_for("student_dashboard"))
             else:
+                # Password change requested: generate OTP and send email
                 otp = generate_otp()
                 session['awaiting_otp'] = True
                 session['pending_profile'] = {
@@ -1530,16 +919,18 @@ def edit_profile():
                     "password": form.password.data,
                 }
                 session['otp_code'] = otp
-                smtp.send_otp_email(form.email.data.lower(), otp)
+                send_otp_email(form.email.data.lower(), otp)
                 flash("OTP sent to your email for password change.", "info")
                 return render_template("otp_verify.html")
 
         if request.method == "GET":
+            # Pre-fill form on GET
             form.name.data = student.get("name", "")
             form.email.data = student.get("email", "")
             form.phone.data = student.get("phone", "")
         return render_template("edit_profile.html", form=form)
 
+    # Second phase: OTP verification form submission
     if request.method == "POST" and 'otp' in request.form:
         user_input_otp = request.form.get("otp")
         pending = session.get('pending_profile')
@@ -1559,103 +950,19 @@ def edit_profile():
             flash("Incorrect OTP. Please try again.", "danger")
         return render_template("otp_verify.html")
 
+    # Fallback: render OTP verification form
     return render_template("otp_verify.html")
 
-# --- Student Self-Assessment Routes ---
-
-@app.route('/student/self_assessment')
-@login_required
-def self_assessment_start():
-    """Initial route to start the self-assessment."""
-    if current_user.role != 'student':
-        flash("You are not authorized to access this page.", "danger")
-        return redirect(url_for('teacher_dashboard'))
-    return redirect(url_for('self_assessment_step', step=1))
-
-
-@app.route('/student/self_assessment/<int:step>', methods=['GET', 'POST'])
-@login_required
-def self_assessment_step(step):
-    """Multi-step route for the self-assessment."""
-    if current_user.role != 'student':
-        flash("You are not authorized to access this page.", "danger")
-        return redirect(url_for('teacher_dashboard'))
-
-    form = SelfAssessmentForm()
-    
-    # Define which questions belong to each step
-    step_map = {
-        1: ['q1', 'q2'],
-        2: ['q3', 'q4'],
-        3: ['q5']
-    }
-
-    if step not in step_map:
-        abort(404)
-
-    if request.method == 'POST':
-        # Check if the submitted data is for the current step
-        all_present = True
-        for q in step_map[step]:
-            if not getattr(form, q).data:
-                all_present = False
-                break
-
-        if all_present:
-            # Store data from the current step in the session
-            for q in step_map[step]:
-                session[q] = getattr(form, q).data
-            
-            # Check if there is a next step
-            if step < len(step_map):
-                return redirect(url_for('self_assessment_step', step=step + 1))
-            else:
-                # Final step: combine all data and save to DB
-                try:
-                    assessment_data = {
-                        'student_id': current_user.student_id,
-                        'student_name': current_user.name,
-                        'submission_date': datetime.now(timezone.utc),
-                        'q1_answer': session.get('q1'),
-                        'q2_answer': session.get('q2'),
-                        'q3_answer': session.get('q3'),
-                        'q4_answer': session.get('q4'),
-                        'q5_answer': session.get('q5'),
-                    }
-                    mongo.db.self_assessments.insert_one(assessment_data)
-
-                    # Clear session data
-                    for q in step_map:
-                        for field in step_map[q]:
-                            session.pop(field, None)
-
-                    flash("Your self-assessment has been recorded. Thank you!", "success")
-                    return redirect(url_for('student_dashboard'))
-                except Exception as e:
-                    print(f"Error saving self-assessment: {e}")
-                    flash("An error occurred while submitting your answers. Please try again.", "danger")
-        else:
-            flash("Please fill out all the fields.", "warning")
-    
-    # Handle GET request and re-render on validation failure
-    if step == 1:
-        return render_template('self_assessment_part1.html', form=form, step=step)
-    elif step == 2:
-        return render_template('self_assessment_part2.html', form=form, step=step)
-    elif step == 3:
-        return render_template('self_assessment_part3.html', form=form, step=step)
-
-# --- Teacher Route to View Self-Assessment Answers ---
-@app.route('/teacher/student_reflections')
-@teacher_required
-def view_student_reflections():
-    reflections = list(mongo.db.self_assessments.find({}).sort("submission_date", -1))
-    return render_template('student_reflections.html', reflections=reflections)
 
 # ---------- Teacher's Applied and Registered Students ----------
+
+# Applied students filtered on teacher dashboard
 @app.route("/teacher/applied_students")
-@teacher_required
+@login_required
 def applied_students():
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
     name_filter = request.args.get("name", "").strip()
     status_filter = request.args.get("status", "").strip()
 
@@ -1695,6 +1002,343 @@ def applied_students():
                            status_filter=status_filter,
                            statuses=statuses)
 
+
+# Registered students with sorting options
+@app.route("/teacher/registered_students")
+@login_required
+def registered_students():
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
+    # Get filters from query params
+    name_filter = request.args.get("name", "").strip().lower()
+    student_id_filter = request.args.get("student_id", "").strip().lower()
+    phone_filter = request.args.get("phone", "").strip()
+    email_filter = request.args.get("email", "").strip().lower()
+
+    # Sorting
+    sort_field = request.args.get("sort", "name")
+    direction = request.args.get("direction", "asc")
+    allowed_sort_fields = {"name", "student_id", "phone", "email"}
+    sort_by = sort_field if sort_field in allowed_sort_fields else "name"
+    sort_dir = 1 if direction == "asc" else -1
+
+    # Build MongoDB query with filters
+    query = {"role": "student"}
+    if name_filter:
+        query["name"] = {"$regex": name_filter, "$options": "i"}
+    if student_id_filter:
+        query["student_id"] = {"$regex": student_id_filter, "$options": "i"}
+    if phone_filter:
+        query["phone"] = {"$regex": phone_filter}
+    if email_filter:
+        query["email"] = {"$regex": email_filter, "$options": "i"}
+
+    # Query and sort
+    students = list(mongo.db.users.find(query).sort(sort_by, sort_dir))
+
+    # Pass everything to the template
+    return render_template("registered_students.html",
+                           students=students,
+                           name_filter=name_filter,
+                           student_id_filter=student_id_filter,
+                           phone_filter=phone_filter,
+                           email_filter=email_filter,
+                           sort_field=sort_by,
+                           direction=direction)
+
+# New route for clear applications page
+@app.route("/teacher/clear_applications")
+@login_required
+def clear_applications():
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
+    name_filter = request.args.get("name", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    resume_filter = request.args.get("resume", "").strip()
+
+    pipeline = [
+        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+        {"$unwind": "$user"},
+        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
+        {"$unwind": "$job"},
+        {"$sort": {"applied_at": -1}}
+    ]
+
+    match_filters = {}
+    if name_filter:
+        match_filters["user.name"] = {"$regex": name_filter, "$options": "i"}
+    if status_filter:
+        match_filters["status"] = status_filter
+    if resume_filter == 'uploaded':
+        match_filters["resume_filename"] = {"$exists": True, "$ne": None}
+    elif resume_filter == 'not_uploaded':
+        match_filters["resume_filename"] = {"$exists": False}
+
+    if match_filters:
+        pipeline.insert(0, {"$match": match_filters})
+
+    applications = list(mongo.db.applications.aggregate(pipeline))
+    all_statuses = ["pending_resume", "submitted", "approved", "rejected", "rejected_auto", "corrections_needed"]
+    resume_options = [
+        {"value": "", "label": "All"},
+        {"value": "uploaded", "label": "Resume Uploaded"},
+        {"value": "not_uploaded", "label": "Resume Not Uploaded"},
+    ]
+
+    return render_template(
+        "clear_applications.html",
+        applications=applications,
+        name_filter=name_filter,
+        status_filter=status_filter,
+        resume_filter=resume_filter,
+        statuses=all_statuses,
+        resume_options=resume_options
+    )
+
+@app.route('/teacher/clear_applications_bulk', methods=['POST'])
+@login_required
+def clear_applications_bulk():
+    if current_user.role != 'teacher':
+        return redirect(url_for('student_dashboard'))
+
+    app_ids = request.form.getlist('app_ids')
+    if not app_ids:
+        flash('No applications selected.', 'warning')
+        return redirect(url_for('clear_applications'))
+
+    object_ids = [ObjectId(app_id) for app_id in app_ids]
+
+    # Find all applications to clear to gather job_ids
+    apps_to_clear = list(mongo.db.applications.find({"_id": {"$in": object_ids}}))
+    job_id_to_count = {}
+    for app_doc in apps_to_clear:
+        job_id = app_doc['job_id']
+        job_id_to_count[job_id] = job_id_to_count.get(job_id, 0) + 1
+
+    # Delete the applications
+    result = mongo.db.applications.delete_many({"_id": {"$in": object_ids}})
+
+    # Increment vacancies for each affected job
+    for job_id, inc_count in job_id_to_count.items():
+        mongo.db.jobs.update_one(
+            {"_id": job_id},
+            {"$inc": {"vacancies": inc_count}}
+        )
+
+    flash(f'{result.deleted_count} application(s) cleared and vacancies updated.', 'success')
+    return redirect(url_for('clear_applications'))
+ 
+@app.route("/teacher/assess", methods=["GET", "POST"])
+@login_required
+def assess_students():
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))
+
+    # Handle POST request to update application status and feedback
+    if request.method == "POST":
+        app_id = request.form.get("app_id")
+        new_status = request.form.get("status")
+        feedback = request.form.get("feedback", "").strip()
+
+        if app_id and new_status in {"approved", "rejected", "corrections_needed"}:
+            mongo.db.applications.update_one(
+                {"_id": ObjectId(app_id)},
+                {"$set": {"status": new_status, "teacher_feedback": feedback}}
+            )
+            flash("Application updated successfully.", "success")
+        else:
+            flash("Invalid update data.", "danger")
+        return redirect(url_for("assess_students"))
+
+    # GET request: handle filtering parameters
+    name_filter = request.args.get("name", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    resume_filter = request.args.get("resume", "").strip()
+
+    pipeline = [
+        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+        {"$unwind": "$user"},
+        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
+        {"$unwind": "$job"},
+        {"$sort": {"applied_at": -1}},
+    ]
+
+    match_filters = {}
+    if name_filter:
+        match_filters["user.name"] = {"$regex": name_filter, "$options": "i"}
+    if status_filter:
+        match_filters["status"] = status_filter
+    if resume_filter == "uploaded":
+        match_filters["resume_filename"] = {"$exists": True, "$ne": None}
+    elif resume_filter == "not_uploaded":
+        match_filters["resume_filename"] = {"$exists": False}
+
+    if match_filters:
+        pipeline.insert(0, {"$match": match_filters})
+
+    applications = list(mongo.db.applications.aggregate(pipeline))
+
+    now = datetime.utcnow()
+
+    # Compute upload duration in hours and add field to each app
+    for app in applications:
+        applied_at = app.get("applied_at")
+        resume_uploaded_at = app.get("resume_uploaded_at")
+
+        if applied_at and resume_uploaded_at:
+            duration = resume_uploaded_at - applied_at
+            hours = duration.total_seconds() / 3600
+            app["upload_duration_hours"] = round(hours, 1)
+        elif applied_at and app.get("resume_filename"):
+            # Estimate duration as current time - applied_at if uploaded_at missing
+            duration = now - applied_at
+            hours = duration.total_seconds() / 3600
+            app["upload_duration_hours"] = round(hours, 1)
+        else:
+            app["upload_duration_hours"] = None
+
+    all_statuses = [
+        "pending_resume", "submitted", "approved",
+        "rejected", "rejected_auto", "corrections_needed"
+    ]
+    resume_options = [
+        {"value": "", "label": "All"},
+        {"value": "uploaded", "label": "Resume Uploaded"},
+        {"value": "not_uploaded", "label": "Resume Not Uploaded"},
+    ]
+
+    return render_template(
+        "assess_students.html",
+        applications=applications,
+        name_filter=name_filter,
+        status_filter=status_filter,
+        resume_filter=resume_filter,
+        statuses=all_statuses,
+        resume_options=resume_options,
+    )
+
+@app.route("/teacher/edit_profile", methods=["GET", "POST"])
+@login_required
+def edit_teacher_profile():
+    if current_user.role != "teacher":
+        return redirect(url_for("student_dashboard"))  # Only allow teachers!
+
+    teacher = mongo.db.users.find_one({"_id": ObjectId(current_user.id)})
+    if not teacher:
+        flash("User not found", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    form = EditProfileForm()
+    if form.validate_on_submit():
+        update_dict = {
+            "name": form.name.data,
+            "email": form.email.data.lower(),
+            "phone": form.phone.data,
+        }
+        # ✅ Fixed this line: proper check for filled password field
+        if form.password.data and form.password.data.strip():
+            update_dict["pw_hash"] = hash_pw(form.password.data)
+
+        mongo.db.users.update_one(
+            {"_id": ObjectId(current_user.id)},
+            {"$set": update_dict}
+        )
+        flash("Profile updated!", "success")
+        return redirect(url_for("teacher_dashboard"))
+
+    if request.method == "GET":
+        form.name.data = teacher.get("name", "")
+        form.email.data = teacher.get("email", "")
+        form.phone.data = teacher.get("phone", "")
+
+    return render_template("edit_teacher_profile.html", form=form)
+
+import io
+import pandas as pd
+from flask import send_file
+from bson.objectid import ObjectId
+
+from functools import wraps
+from flask import flash, redirect, url_for
+from flask_login import current_user, login_required
+
+def teacher_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != "teacher":
+            flash("You must be a teacher to access this page.", "warning")
+            return redirect(url_for("dashboard"))  # or any other appropriate page
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route("/teacher/export_assessed")
+@teacher_required
+def export_assessed_students():
+    # Query assessed applications (approved, rejected or corrections needed)
+    assessed_statuses = ["approved", "rejected", "corrections_needed"]
+    pipeline = [
+        {"$match": {"status": {"$in": assessed_statuses}}},
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }
+        },
+        {"$unwind": "$user"},
+        {
+            "$lookup": {
+                "from": "jobs",
+                "localField": "job_id",
+                "foreignField": "_id",
+                "as": "job"
+            }
+        },
+        {"$unwind": "$job"},
+        {"$sort": {"applied_at": -1}},
+    ]
+    results = list(mongo.db.applications.aggregate(pipeline))
+
+    # Prepare data for Excel
+    data = []
+    for app in results:
+        row = {
+            "Student Name": app["user"].get("name", ""),
+            "Student Email": app["user"].get("email", ""),
+            "Job Title": app["job"].get("title", ""),
+            "Status": app.get("status", "").replace("_", " ").title(),
+            "Applied At": app.get("applied_at").strftime("%Y-%m-%d %H:%M") if app.get("applied_at") else "",
+            "Teacher Feedback": app.get("teacher_feedback") or "",
+        }
+        data.append(row)
+
+    # Create DataFrame
+    df = pd.DataFrame(data)
+
+    # Output Excel to a bytes buffer
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Assessed Students")
+
+    output.seek(0)
+
+    # Send file
+    filename = f"Assessed_Students_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return send_file(
+        output,
+        download_name=filename,  
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+
+# ---------- Support and Contact Pages ----------
+
 @app.route("/support")
 def support():
     return render_template("support.html")
@@ -1707,37 +1351,9 @@ def contact():
 def about():
     return render_template("about.html")
 
-@app.route("/creator")
-def creator():
-    return render_template("creator.html")
-
-from flask import request, jsonify
-
-DOG_RESPONSES = [
-    ("hello", "Woof! Hi there, friend! 🐾"),
-    ("resume", "Need résumé tips? Make sure it's clear and shows your unique strengths!"),
-    ("motivate", "You can do it! Remember, I'm your cheerleader 🐶✨"),
-    ("reflection", "Reflect often—growth comes from small steps!"),
-    ("sad", "It's okay to have ruff days. Here’s a tail wag! 🐕🐾"),
-    ("treat", "I love treats! Did you finish a task? Give yourself a treat!"),
-]
-
-@app.route("/virtual_pet_dog_chat", methods=["POST"])
-def virtual_pet_dog_chat():
-    user_msg = request.json.get("msg", "").lower()
-    for kw, reply in DOG_RESPONSES:
-        if kw in user_msg:
-            return jsonify({"reply": reply})
-    # Fallback generic dog reply
-    import random
-    replies = [
-        "I'm here whenever you want to talk or need a little encouragement!",
-        "Wag wag! Let's keep learning new tricks together.",
-        "If you need advice, just ask. I'm a very good dog."
-    ]
-    return jsonify({"reply": random.choice(replies)})
-    
-
-
+# ---------- Run the app ----------
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+
+
+
