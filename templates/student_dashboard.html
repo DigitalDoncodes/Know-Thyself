@@ -258,9 +258,9 @@
             {% endif %}
           </div>
           <div class="app-feedback">{{ app.teacher_feedback or 'No feedback yet.' }}</div>
-
-          {% if app.status in ["pending_resume", "corrections_needed"] %}
-            <form action="{{ url_for('upload', app_id=app._id) }}"
+          
+          {% if app.status == "pending_resume" %}
+            <form action="{{ url_for('upload', app_id=app['_id']) }}"
                   method="POST"
                   enctype="multipart/form-data"
                   class="d-flex flex-column">
@@ -270,10 +270,19 @@
               <label class="form-label">Photo File:</label>
               <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
 
-              <button type="submit" class="btn btn-primary">
-                {% if app.status == 'corrections_needed' %} Re-upload {% else %} Upload {% endif %}
+              <button type="submit" class="btn btn-primary mt-2">
+                Upload Files
               </button>
             </form>
+          {% elif app.status == "corrections_needed" %}
+            <!-- New Dedicated Button linking to the reupload page -->
+            <a href="{{ url_for('reupload_application', app_id=app['_id']) }}" class="btn-action mt-3" style="background:#dc3545; color:#fff;">
+                Submit Corrections
+            </a>
+          {% else %}
+            <div class="text-muted mt-3">
+                Status: {{ app.status.replace('_',' ').title() }}
+            </div>
           {% endif %}
 
           {% if app.teacher_feedback %}
@@ -379,7 +388,7 @@
   <div class="job-box">
     <!-- Title as clickable -->
     <div class="job-title">
-      <a href="{{ url_for('job_detail', job_id=job._id) }}" style="text-decoration: none; color: #3f51b5;">
+      <a href="{{ url_for('job_detail', job_id=job['_id']) }}" style="text-decoration: none; color: #3f51b5;">
         {{ job.title }}
       </a>
     </div>
@@ -404,7 +413,7 @@
       {% elif job.vacancies <= 0 %}
         <span class="text-danger">No vacancies left</span>
       {% else %}
-        <form action="{{ url_for('apply', job_id=job._id) }}" method="POST"
+        <form action="{{ url_for('apply', job_id=job['_id']) }}" method="POST"
               onsubmit="return confirm('Apply for this job? You must upload your résumé and photo within 48 hours.')">
           <button type="submit" class="apply-btn">Apply Now</button>
         </form>
@@ -422,3 +431,4 @@
 {% endif %}
 </div>
 {% endblock %}
+
