@@ -546,8 +546,6 @@ def submit_reupload(app_id):
 def guidelines():
     return render_template("guidelines_modal.html")
 
-# Corrected student_dashboard function
-# In app.py, replace the student_dashboard function with this:
 # In app.py, replace the entire student_dashboard function with this:
 @app.route("/student/")
 @login_required
@@ -579,20 +577,24 @@ def student_dashboard():
         app.get("status") in ("pending_resume", "submitted", "approved") for app in apps
     )
 
-    # In app.py, inside the student_dashboard function, replace the entire loop:
-# .
- now_ist = datetime.now(IST)
+    now_ist = datetime.now(IST)
     for app in apps:
         status = app.get("status", "")
-        # FLAG 1: Button visibility logic is simplified for this new workflow
-        app["show_reupload_button"] = (status == "corrections_needed") 
         
+        # --- FIX: Initialize all required keys before using them ---
+        app["is_reupload_allowed"] = False
+        app["reupload_deadline_ist"] = "N/A"
+        app["reupload_remaining_time"] = "N/A"
+        # --------------------------------------------------------
+
         if status == "approved":
             app["status_message"] = "🎉 Yay! Your application is approved."
         elif status == "rejected":
             app["status_message"] = "😞 Unfortunately, your application was rejected."
         elif status == "corrections_needed":
             app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
+            # FIX: Re-upload is always allowed when corrections are needed
+            app["is_reupload_allowed"] = True
         else:
             app["status_message"] = ""
 
@@ -602,10 +604,10 @@ def student_dashboard():
         else:
             app["resume_deadline"] = deadline.astimezone(IST) if deadline else None
         
-        # --- DEBUGGING LINE (Corrected Dict Access) ---
+        # --- DEBUGGING LINE ---
         print(f"DEBUG: App ID: {app['_id']}, Status: {app.get('status')}, Is Reupload Allowed: {app['is_reupload_allowed']}")
         # --- END DEBUGGING LINE ---
-# ...
+
     return render_template(
         "student_dashboard.html",
         apps=apps,
@@ -614,7 +616,6 @@ def student_dashboard():
         has_active=has_active_application,
         now=now_ist
     )
-
 # In app.py, replace the update_application_status function with this:
 # In app.py
 # ...
