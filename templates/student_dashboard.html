@@ -2,6 +2,7 @@
 {% block title %}Student Dashboard{% endblock %}
 {% block head %}
 <style>
+  /* All existing styles from your provided student_dashboard.html are included here */
   .section-header {
     font-size: 1.6em;
     font-weight: 800;
@@ -155,14 +156,14 @@
     padding: 2.5rem;
     border-radius: 20px;
     width: 90%;
-    height: 80vh; /* Takes up 80% of the viewport height */
-    max-width: 800px; /* A reasonable max-width */
+    height: 80vh; 
+    max-width: 800px; 
     box-shadow: 0 12px 30px rgba(0,0,0,0.25);
     position: relative;
     transform: scale(0.9);
     opacity: 0;
     transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-    overflow-y: auto; /* Adds a scrollbar if content overflows vertically */
+    overflow-y: auto; 
   }
 
   .modal-content.active {
@@ -171,7 +172,7 @@
   }
 
   .close-btn {
-    position: sticky; /* Keeps the close button visible while scrolling */
+    position: sticky; 
     top: 0;
     float: right;
     background: none;
@@ -219,10 +220,6 @@
     margin-bottom: 0.6rem;
   }
 </style>
-
-<style>
-  /* Keep all your existing CSS styles here unchanged (as provided earlier) */
-</style>
 {% endblock %}
 
 {% block content %}
@@ -257,37 +254,36 @@
               Deadline: {{ app.resume_deadline.strftime('%d %b %Y, %I:%M %p') }} IST
             {% endif %}
           </div>
-          <div class="app-feedback">{{ app.teacher_feedback or 'No feedback yet.' }}</div>
           
-          {% if app.status == "pending_resume" %}
-            <form action="{{ url_for('upload', app_id=app['_id']) }}"
-                  method="POST"
-                  enctype="multipart/form-data"
-                  class="d-flex flex-column">
-              <label class="form-label">Résumé File:</label>
-              <input type="file" name="resume" accept=".pdf,.doc,.docx" required class="form-control mb-2">
-
-              <label class="form-label">Photo File:</label>
-              <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
-
-              <button type="submit" class="btn btn-primary mt-2">
-                Upload Files
-              </button>
-            </form>
-          {% elif app.status == "corrections_needed" %}
-            <!-- New Dedicated Button linking to the reupload page -->
-            <a href="{{ url_for('reupload_application', app_id=app['_id']) }}" class="btn-action mt-3" style="background:#dc3545; color:#fff;">
-                Submit Corrections
-            </a>
-          {% else %}
-            <div class="text-muted mt-3">
-                Status: {{ app.status.replace('_',' ').title() }}
-            </div>
-          {% endif %}
-
           {% if app.teacher_feedback %}
             <div class="alert alert-info mt-2">
               <strong>Teacher's Feedback:</strong> {{ app.teacher_feedback }}
+            </div>
+          {% endif %}
+          
+          {% if app.status == "pending_resume" or app.status == "corrections_needed" %}
+            <form action="{{ url_for('upload', app_id=app['_id']) }}"
+                  method="POST"
+                  enctype="multipart/form-data"
+                  class="d-flex flex-column mt-3">
+              
+              <p class="mb-2 small fw-bold text-{{ 'danger' if app.status == 'corrections_needed' else 'primary' }}">
+                  {{ 'RESUBMIT CORRECTIONS BELOW' if app.status == 'corrections_needed' else 'UPLOAD FILES TO COMPLETE APPLICATION' }}
+              </p>
+              
+              <label class="form-label small">Résumé File (PDF/DOCX):</label>
+              <input type="file" name="resume" accept=".pdf,.doc,.docx" required class="form-control mb-2">
+
+              <label class="form-label small">Photo File (JPG/PNG):</label>
+              <input type="file" name="photo" accept=".jpg,.jpeg,.png" required class="form-control mb-2">
+
+              <button type="submit" class="btn btn-{{ 'danger' if app.status == 'corrections_needed' else 'primary' }} mt-2">
+                {{ 'Re-Submit Files' if app.status == 'corrections_needed' else 'Upload & Submit' }}
+              </button>
+            </form>
+          {% else %}
+            <div class="text-muted mt-3">
+                Status: {{ app.status.replace('_',' ').title() }}
             </div>
           {% endif %}
         </div>
@@ -297,7 +293,6 @@
     <div class="text-center text-muted" style="font-size: 1.14em; padding: 19px; background: #eaf4fa; border-radius: 14px;">No active applications yet. Apply to a job below!</div>
   {% endif %}
 
-  <!-- Redesigned Resume Guidelines Card -->
   <div class="zoom-box text-center" id="viewGuidelinesBtn"
      style="border-image: linear-gradient(60deg,#8e2de2, #4a00e0) 1;">
   <i class="bi bi-journal-text display-4 mb-3 text-primary"></i>
@@ -308,9 +303,8 @@
   </div>
 </div>
 
-<!-- Modal for Resume Guidelines -->
 <div id="guidelinesModal" class="modal-overlay">
-  <div class="modal-content">
+  <di v class="modal-content">
     <button class="close-btn" id="closeGuidelinesBtn">&times;</button>
     <div class="guidelines-header">Psychology CV Guidelines</div>
     <div class="guidelines-content">
@@ -351,6 +345,7 @@
 </div>
 
 <script>
+  // All existing scripts for modal behavior are included here
   const modal = document.getElementById("guidelinesModal");
   const btn = document.getElementById("viewGuidelinesBtn");
   const closeBtn = document.getElementById("closeGuidelinesBtn");
@@ -386,15 +381,13 @@
   
    {% for job in jobs %}
   <div class="job-box">
-    <!-- Title as clickable -->
     <div class="job-title">
       <a href="{{ url_for('job_detail', job_id=job['_id']) }}" style="text-decoration: none; color: #3f51b5;">
         {{ job.title }}
       </a>
     </div>
 
-    <!-- Preview -->
-      <div class="job-desc">
+    <div class="job-desc">
 {% if job.job_description %}
   {{ job.job_description[:140] }}{% if job.job_description|length > 140 %}...{% endif %}
 {% else %}
@@ -404,7 +397,6 @@
 
     <div class="text-success mb-2">Vacancies: {{ job.vacancies }}</div>
 
-    <!-- Application Logic -->
     {% if current_user.is_authenticated and current_user.role == 'student' %}
       {% if job._id in applied_ids %}
         <span class="btn-action" style="background:#b2dfdb; color:#234;">Already Applied</span>
