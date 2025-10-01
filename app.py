@@ -621,63 +621,38 @@ def student_dashboard():
         now=now_ist
     )
 
-@app.route("/teacher/application/update_status/<app_id>", methods=["POST"])
-@login_required
+from smtp import send_status_email   # import from smtp.py
+
+@app.route('/update_application_status/<int:app_id>', methods=['POST'])
 def update_application_status(app_id):
-    if current_user.role != "teacher":
-        flash("Unauthorized access.", "danger")
-        return redirect(url_for("student_dashboard"))
+    status = request.form['status']
+    feedback = request.form.get('feedback', '')
 
-    status = request.form.get("status")
-    feedback = request.form.get("feedback", "").strip()
+    conn = get_db_connection()
+    app_entry = conn.execute("SELECT * FROM applications WHERE id = ?", (app_id,)).fetchone()
 
-    if status not in {"approved", "rejected", "needs_corrections"}:
-        flash("Invalid status.", "danger")
-        return redirect(url_for("teacher_dashboard"))
+    if not app_entry:
+        conn.close()
+        flash("Application not found", "danger")
+        return redirect(url_for('assess_students'))
 
-    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
-    if not app_doc:
-        flash("Application not found.", "danger")
-        return redirect(url_for("teacher_dashboard"))
+    conn.execute("UPDATE applications SET status = ?, teacher_feedback = ? WHERE id = ?",
+                 (status, feedback, app_id))
+    conn.commit()
+    conn.close()
 
-    student_doc = mongo.db.users.find_one({"_id": app_doc["user_id"]})
-    job_doc = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
-    
-    if not student_doc or not job_doc:
-        flash("Related student or job data not found.", "danger")
-        return redirect(url_for("teacher_dashboard"))
-
-    update_fields = {
-        "status": status, 
-        "teacher_feedback": feedback
-    }
-    
-    # Store corrections_at, even if we are not actively enforcing it now
-    if status == "needs_corrections":
-        update_fields["corrections_at"] = datetime.now(timezone.utc)
-
-    mongo.db.applications.update_one(
-        {"_id": ObjectId(app_id)},
-        {"$set": update_fields}
+    # 🔔 Trigger email notification
+    send_status_email(
+        recipient=app_entry['student_email'],
+        student_name=app_entry['student_name'],
+        job_title=app_entry['job_title'],
+        status=status,
+        feedback=feedback
     )
 
-    # FIX 1: Pass the 'app' object to the scheduler
-    scheduler.add_job(
-        func=send_application_status_email,
-        trigger='date',
-        run_date=datetime.now() + timedelta(seconds=1),
-        args=[
-            app,  # <--- THIS IS THE APP OBJECT BEING PASSED
-            student_doc["email"],
-            student_doc["name"],
-            status,
-            job_doc["title"],
-            feedback
-        ]
-    )
-    
-    flash("Application updated. An email notification will be sent shortly.", "success")
-    return redirect(url_for("assess_students"))
+    flash("Application status updated and student notified via email.", "success")
+    return redirect(url_for('assess_students'))
+
 
 # In app.py, replace the resume_reupload function with this:
 @app.route("/resume/reupload/<app_id>", methods=["POST"])
