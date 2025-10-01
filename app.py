@@ -48,8 +48,7 @@ app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 7 * 
 init_extensions(app)
 
 # Initialize Flask-Mail and set it in the smtp module for cross-module usage
-mail_instance = smtp.init_mail_app(app)
-smtp.set_mail_instance(mail_instance)
+
 
 # Load MongoDB URI from environment variables
 app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
