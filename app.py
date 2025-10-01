@@ -760,6 +760,28 @@ def support():
     """Renders the FAQ/Support page."""
     return render_template('support.html')
 
+@app.route('/teacher')  # Define the URL path
+@login_required 
+# The function name MUST match the endpoint used in url_for: 'teacher_dashboard'
+def teacher_dashboard(): 
+    # Logic to fetch data for the teacher dashboard (e.g., student lists)
+    
+    # Render the teacher dashboard template
+    return render_template('teacher_dashboard.html', 
+                           # pass any required data here, e.g. jobs, students
+                           )
+
+@app.route('/uploads/<path:filename>')
+# The function name MUST be 'view_resume' (the endpoint)
+# The route variable MUST be 'filename'
+def view_resume(filename):
+    # Assuming your file uploads are stored in a folder called 'upload'
+    # relative to your app.py, replace 'app.root_path' if necessary.
+    upload_dir = os.path.join(app.root_path, 'upload')
+
+    # Use send_from_directory for secure file serving
+    return send_from_directory(upload_dir, filename)
+
 @app.route('/teacher/reassign_reupload_time/<app_id>', methods=['POST'])
 @login_required
 @teacher_required
