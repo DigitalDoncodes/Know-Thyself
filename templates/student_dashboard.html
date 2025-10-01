@@ -228,16 +228,12 @@
   <div class="text-center mb-4">Manage Your Applications, Explore Jobs, and Grow 🚀</div>
 
   <div class="dashboard-grid">
-    <div class="growth-card">
-      <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Growth & Reflection Hub</div>
-      <div class="growth-card-desc">Complete engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
-      <a href="{{ url_for('growth_menu') }}" class="btn-action">Go to Growth Hub</a>
+
     </div>
     <div class="growth-card">
       <div class="growth-card-title"><span style="font-size:1.37em;">🌱</span> Self Assessment</div>
       <div class="growth-card-desc">Complete engaging activities designed to boost self-awareness, well-being, and fun. Track your progress!</div>
-      <a href="{{ url_for('self_assessment_step', step=1) }}" class="btn-action">Start Self Assessment</a>
-    </div>
+      <a href="{{ url_for('self_assessment_step', step=1) }}" class="btn-action">Start Self Assessment</a>    </div>
   </div>
 
   <div class="section-header">Your Active Applications</div>
@@ -423,5 +419,3 @@
 {% endif %}
 </div>
 {% endblock %}
-
-
