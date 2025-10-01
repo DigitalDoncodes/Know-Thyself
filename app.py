@@ -620,7 +620,7 @@ def student_dashboard():
         now=now_ist
     )
 
-from smtp import send_status_email   # import from smtp.py
+from smtp import send_application_status_email
 
 @app.route('/update_application_status/<int:app_id>', methods=['POST'])
 def update_application_status(app_id):
@@ -640,14 +640,14 @@ def update_application_status(app_id):
     conn.commit()
     conn.close()
 
-    # 🔔 Trigger email notification
-    send_status_email(
-        recipient=app_entry['student_email'],
-        student_name=app_entry['student_name'],
-        job_title=app_entry['job_title'],
-        status=status,
-        feedback=feedback
-    )
+    send_application_status_email(
+    recipient=app_entry['student_email'],
+    student_name=app_entry['student_name'],
+    job_title=app_entry['job_title'],
+    status=status,
+    feedback=feedback
+)
+
 
     flash("Application status updated and student notified via email.", "success")
     return redirect(url_for('assess_students'))
