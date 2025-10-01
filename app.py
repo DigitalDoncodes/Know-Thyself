@@ -495,6 +495,52 @@ def upload_resume(job_id):
 
     return redirect(url_for("student_dashboard"))
 
+@app.route("/reupload_application/<app_id>")
+@login_required
+def reupload_application(app_id):
+    if current_user.role != "student":
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("teacher_dashboard"))
+
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
+        flash("Application not found or access denied.", "danger")
+        return redirect(url_for("student_dashboard"))
+
+    if app_doc.get("status") != "corrections_needed":
+        flash("Re-upload is not currently required for this application.", "warning")
+        return redirect(url_for("student_dashboard"))
+
+    job = mongo.db.jobs.find_one({"_id": app_doc["job_id"]})
+    job_title = job.get("title", "Job Application")
+
+    # This renders the new form, passing necessary data
+    return render_template(
+        "reupload_form.html",
+        app_id=str(app_doc["_id"]),
+        job_title=job_title,
+        feedback=app_doc.get("teacher_feedback", "No specific feedback provided.")
+    )
+
+# --- NEW ROUTE 2: Handles Submission from the New Form ---
+@app.route("/submit_reupload/<app_id>", methods=["POST"])
+@login_required
+def submit_reupload(app_id):
+    app_doc = mongo.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app_doc or app_doc["user_id"] != ObjectId(current_user.id):
+        flash("Unauthorized re-upload attempt.", "danger")
+        return redirect(url_for("student_dashboard"))
+    
+    if app_doc.get("status") != "corrections_needed":
+        flash("This application does not require corrections at this time.", "warning")
+        return redirect(url_for("student_dashboard"))
+
+    # Reuses the existing file handling logic (which automatically handles email sending)
+    # handle_resume_submission updates status to 'submitted' and sends confirmation mail
+    return handle_resume_submission(app_doc, new_status="submitted", clear_feedback=True)
+
+#### B. Modify `student_dashboard` Loop Logic (Button Link)
+
 
 @app.route("/guidelines")
 def guidelines():
@@ -534,13 +580,12 @@ def student_dashboard():
     )
 
     # In app.py, inside the student_dashboard function, replace the entire loop:
-# ...
-    now_ist = datetime.now(IST)
+# .
+ now_ist = datetime.now(IST)
     for app in apps:
         status = app.get("status", "")
-        app["is_reupload_allowed"] = False
-        app["reupload_deadline_ist"] = "N/A" # Simplified
-        app["reupload_remaining_time"] = "N/A" # Simplified
+        # FLAG 1: Button visibility logic is simplified for this new workflow
+        app["show_reupload_button"] = (status == "corrections_needed") 
         
         if status == "approved":
             app["status_message"] = "🎉 Yay! Your application is approved."
@@ -548,8 +593,6 @@ def student_dashboard():
             app["status_message"] = "😞 Unfortunately, your application was rejected."
         elif status == "corrections_needed":
             app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
-            # FIX 2: Re-upload is always allowed when corrections are needed (omitting time limit)
-            app["is_reupload_allowed"] = True
         else:
             app["status_message"] = ""
 
