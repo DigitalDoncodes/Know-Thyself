@@ -5,10 +5,10 @@ from email.mime.multipart import MIMEMultipart
 # -------------------------------
 # SMTP Configuration
 # -------------------------------
-SMTP_SERVER = smtp-relay.brevo.com   # or your SMTP provider
+SMTP_SERVER = "smtp-relay.brevo.com"   # or your SMTP provider
 SMTP_PORT = 587
-SMTP_USER = 98424e002@smtp-brevo.com  # change to your email
-SMTP_PASS = DRMBnxzSC7hIEQvJ     # use App Password if Gmail
+SMTP_USER = "98424e002@smtp-brevo.com"  # change to your email
+SMTP_PASS = "DRMBnxzSC7hIEQvJ"     # use App Password if Gmail
 
 # -------------------------------
 # Function to send status emails
