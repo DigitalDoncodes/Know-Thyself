@@ -1,234 +1,231 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-100">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Know-Thyself{% endblock %}</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Font Awesome for icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <!-- Inter Font -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}Job Portal{% endblock %}</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    /* Dynamic, wave-like animated background for the header */
-    .animated-header-bg {
-      position: relative;
-      background: linear-gradient(135deg, #1f2937, #153e5e);
+    /* --- Core Typography and Base --- */
+    body { 
+      background: #f0f3f6; /* Light gray background */
+      font-family: 'Inter', sans-serif;
+      color: #333;
     }
-    .animated-header-bg::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: radial-gradient(circle at 15% 50%, #2e4465, transparent 60%),
-                    radial-gradient(circle at 85% 50%, #4a5568, transparent 60%);
-        animation: psy-waves 40s ease-in-out infinite alternate;
-        opacity: 0.8;
+    h1, h2, h3, .navbar-brand { font-family: 'Poppins', sans-serif; }
+
+    /* --- Navbar & Header --- */
+    .app-navbar {
+      background: #ffffff; /* White navbar for clean contrast */
+      border-bottom: 3px solid transparent;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      /* Subtle gradient border effect */
+      border-image: linear-gradient(90deg, #1e3c72, #2a5298, #43cea2) 1;
+      padding-top: 10px;
+      padding-bottom: 10px;
     }
-    @keyframes psy-waves {
-        0% { transform: scale(1) translate(0, 0); }
-        100% { transform: scale(1.5) translate(-10%, 10%); }
+    
+    /* Logo Styling */
+    .navbar-logo {
+      height: 40px; /* Adjust size for professional look */
+      width: auto;
+      margin-right: 8px;
+      vertical-align: middle;
+      transition: transform 0.3s ease-out;
+    }
+    .navbar-logo:hover {
+        transform: scale(1.05);
+    }
+    
+    .navbar-brand { 
+      font-weight: 800; 
+      letter-spacing: 0.5px;
+      color: #1e3c72 !important; /* Deep blue text */
+      font-size: 1.6rem;
+    }
+    .navbar-nav .nav-link {
+      font-weight: 500;
+      color: #2c3e50 !important;
+      padding: 10px 15px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    .navbar-nav .nav-link:hover {
+      background-color: rgba(30, 60, 114, 0.05); /* Light blue hover */
+      color: #1e3c72 !important;
     }
 
-    /* Unique text animations for navigation links on hover */
-    .animated-link {
-        display: inline-block;
-        transition: transform 0.3s, color 0.3s;
-        transform-style: preserve-3d;
-        perspective: 1000px;
-        position: relative;
+    /* --- Main Content Container --- */
+    .main-content-container {
+      padding-top: 20px;
+      animation: fadeIn 0.8s ease-out; /* Smooth entrance */
     }
-    .animated-link .char {
-        display: inline-block;
-        transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+
+    /* --- Footer --- */
+    .app-footer { 
+      background: linear-gradient(180deg, #2c3e50 0%, #1e3c72 100%); /* Deep blue/charcoal gradient */
+      color: #f0f3f6;
+      padding-top: 30px;
+      padding-bottom: 30px;
+      box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
+      font-size: 0.95rem;
     }
-    .animated-link:hover .char {
-        transform: translateY(-5px);
-        color: #fff;
+    .app-footer a { color: #56c6d9; text-decoration: none; }
+    .app-footer a:hover { color: #ffffff; }
+
+    /* --- Flash Messages (Toasts) --- */
+    .toast-container {
+        z-index: 1090 !important; /* Higher than Bootstrap's default modals/popovers */
     }
-    .animated-link:hover .char:nth-child(even) {
-        transform: translateY(5px);
+    .toast {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+    .bg-success { background-color: #43cea2 !important; } /* Green accent */
+    .bg-danger { background-color: #e74c3c !important; } /* Red accent */
+    .bg-info { background-color: #56c6d9 !important; } /* Light blue accent */
+    .btn-close-white { filter: invert(1); } /* Ensure close button is visible */
+
+    /* --- Custom Fonts (Imported via Google Fonts API) --- */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap');
+    
+    /* --- Animations --- */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="h-full">
+<body>
 
-  <!-- Main Content Wrapper -->
-  <div class="min-h-full flex flex-col">
-
-    <!-- Navigation Header -->
-    <header class="animated-header-bg shadow-xl">
-      <nav class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <!-- Logo and Brand Name -->
-            <a href="{{ url_for('startpage') }}" class="flex-shrink-0 flex items-center space-x-2 text-white transition-transform transform hover:scale-110 duration-300 ease-in-out">
-              <img src="https://res.cloudinary.com/ddqeqxamf/image/upload/v1754506544/psychology_logo_dqa0hs.jpg" alt="Know-Thyself Logo" class="h-10 w-auto rounded-lg">
-              <span class="text-xl font-bold tracking-tight">Know-Thyself</span>
-            </a>
-            
-            <!-- Main Navigation Links -->
-            <div class="hidden md:flex items-center space-x-4">
-              <a href="{{ url_for('job_list') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Jobs</a>
-              {% if current_user.is_authenticated %}
-                {% if current_user.role == 'student' %}
-                  <a href="{{ url_for('student_dashboard') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Dashboard</a>
-                {% elif current_user.role == 'teacher' %}
-                  <a href="{{ url_for('teacher_dashboard') }}" class="animated-link text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200">Teacher Dashboard</a>
-                {% endif %}
-              {% endif %}
-            </div>
-          </div>
-
-          <!-- Right-side User Menu -->
-          <div class="hidden md:block">
-            <div class="ml-4 flex items-center md:ml-6 space-x-4">
-              {% if current_user.is_authenticated %}
-                <!-- User dropdown -->
-                <div class="relative group">
-                  <button type="button" class="max-w-xs bg-gray-800 rounded-md flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white p-2">
-                    <span class="sr-only">Open user menu</span>
-                    <span class="text-white font-medium">{{ current_user.name or 'User' }}</span>
-                    <i class="fas fa-chevron-down text-white text-xs ml-2 transform transition-transform duration-200 group-hover:rotate-180"></i>
-                  </button>
-                  <div class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-300 ease-in-out z-50">
-                    {% if current_user.role == 'student' %}
-                      <a href="{{ url_for('edit_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Edit Profile</a>
-                    {% elif current_user.role == 'teacher' %}
-                      <a href="{{ url_for('edit_teacher_profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Edit Profile</a>
-                    {% endif %}
-                    <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition duration-150">Sign out</a>
-                  </div>
-                </div>
-              {% else %}
-                <a href="{{ url_for('login') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200 hover:shadow-lg">Login</a>
-                <a href="{{ url_for('register') }}" class="text-gray-300 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-200 hover:shadow-lg">Register</a>
-              {% endif %}
-            </div>
-          </div>
+<nav class="navbar navbar-expand-lg app-navbar sticky-top">
+  <div class="container-fluid container">
+    <a class="navbar-brand" href="{{ url_for('startpage') }}">
+        <img src="https://res.cloudinary.com/ddqeqxamf/image/upload/v1754506544/psychology_logo_dqa0hs.jpg" alt="Psychology Portal Logo" class="navbar-logo">
+        Career Launchpad
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+        
+        {% if current_user.is_authenticated %}
           
-          <!-- Mobile menu button -->
-          <div class="-mr-2 flex md:hidden">
-            <button type="button" id="mobile-menu-button" class="bg-gray-800 inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white transition duration-200">
-              <span class="sr-only">Open main menu</span>
-              <i class="fas fa-bars"></i>
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <!-- Mobile menu, show/hide based on menu state. -->
-      <div class="md:hidden" id="mobile-menu" style="display:none;">
-        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          <a href="{{ url_for('job_list') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Jobs</a>
-          {% if current_user.is_authenticated %}
-            {% if current_user.role == 'student' %}
-              <a href="{{ url_for('student_dashboard') }}" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium" aria-current="page">Dashboard</a>
-            {% elif current_user.role == 'teacher' %}
-              <a href="{{ url_for('teacher_dashboard') }}" class="bg-gray-900 text-white block px-3 py-2 rounded-md text-base font-medium" aria-current="page">Teacher Dashboard</a>
-            {% endif %}
-            <a href="{{ url_for('logout') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Logout</a>
-          {% else %}
-            <a href="{{ url_for('login') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</a>
-            <a href="{{ url_for('register') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Register</a>
+          {% if current_user.role == 'teacher' %}
+            <li class="nav-item">
+                <a class="nav-link btn btn-sm btn-outline-primary ms-lg-2" href="{{ url_for('teacher_dashboard') }}">
+                    <i class="fas fa-user-tie me-1"></i> Teacher Hub
+                </a>
+            </li>
+          {% elif current_user.role == 'student' %}
+            <li class="nav-item">
+                <a class="nav-link btn btn-sm btn-outline-primary ms-lg-2" href="{{ url_for('student_dashboard') }}">
+                    <i class="fas fa-tachometer-alt me-1"></i> Student Dashboard
+                </a>
+            </li>
           {% endif %}
-        </div>
-      </div>
-    </header>
+          
+          <li class="nav-item ms-lg-2">
+              <a class="btn btn-danger btn-sm" href="{{ url_for('logout') }}">
+                  <i class="fas fa-sign-out-alt me-1"></i> Logout
+              </a>
+          </li>
+          
+        {% else %}
+          <li class="nav-item ms-lg-2">
+              <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">
+                  <i class="fas fa-sign-in-alt me-1"></i> Login
+              </a>
+          </li>
+          <li class="nav-item ms-lg-2">
+              <a class="btn btn-outline-primary btn-sm" href="{{ url_for('register') }}">
+                  <i class="fas fa-user-plus me-1"></i> Register
+              </a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
 
-    <!-- Flash Messages Block -->
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+<div class="container main-content-container">
+  
+  <div aria-live="polite" aria-atomic="true" class="position-relative">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
-            <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-100 border-l-4 border-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-700 p-4 rounded-md mb-4" role="alert">
-              <div class="flex justify-between items-center">
-                <p class="font-bold">{{ message }}</p>
-                <button type="button" onclick="this.parentElement.parentElement.style.display='none';" class="text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-500 hover:text-{{ 'green' if category == 'success' else 'red' if category == 'danger' else 'yellow' if category == 'warning' else 'blue' }}-700 transition duration-150">
-                  <i class="fas fa-times"></i>
-                </button>
+            {% set toast_class = 'bg-success' if category in ['success','info'] else 'bg-danger' %}
+            <div class="toast align-items-center animate__animated animate__fadeInRight {{ toast_class }} text-white mb-2 show" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="d-flex">
+                <div class="toast-body">
+                  <i class="fas {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-triangle' }} me-2"></i>
+                  {{ message }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
               </div>
             </div>
           {% endfor %}
         {% endif %}
       {% endwith %}
     </div>
-
-    <!-- Page Content -->
-    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div class="bg-white rounded-lg shadow-lg p-6">
-        {% block content %}{% endblock %}
-      </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 py-8 mt-auto">
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col md:flex-row justify-between items-center md:items-start text-center md:text-left">
-          
-          <!-- Logo & Brand -->
-          <div class="mb-6 md:mb-0">
-            <a href="{{ url_for('startpage') }}" class="flex items-center justify-center md:justify-start space-x-2 text-white text-2xl font-bold">
-              <img src="https://res.cloudinary.com/ddqeqxamf/image/upload/v1754506544/psychology_logo_dqa0hs.jpg" alt="Know-Thyself Logo" class="h-10 w-auto rounded-lg">
-              <span>Know-Thyself</span>
-            </a>
-            <p class="mt-4 text-sm text-gray-500">&copy; 2025 Know-Thyself. All rights reserved.</p>
-          </div>
-          
-          <!-- Navigation Links -->
-          <div class="flex flex-wrap justify-center md:justify-start space-x-4 md:space-x-8 text-sm">
-            <a href="{{ url_for('about') }}" class="hover:text-white transition duration-200">About Us</a>
-            <a href="{{ url_for('resources') }}" class="hover:text-white transition duration-200">Resources</a>
-            <a href="{{ url_for('contact') }}" class="hover:text-white transition duration-200">Contact</a>
-            <a href="{{ url_for('support') }}" class="hover:text-white transition duration-200">Support</a>
-          </div>
-
-        </div>
-      </div>
-    </footer>
   </div>
 
-  <script>
-    // Simple script for mobile menu toggle
-    const mobileMenuButton = document.getElementById('mobile-menu-button');
-    const mobileMenu = document.getElementById('mobile-menu');
-    mobileMenuButton.addEventListener('click', () => {
-      const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
-      mobileMenuButton.setAttribute('aria-expanded', !isExpanded);
-      if (isExpanded) {
-        mobileMenu.style.display = 'none';
-      } else {
-        mobileMenu.style.display = 'block';
-      }
-    });
+  {% block content %}{% endblock %}
+</div>
 
-    // Custom script to handle click on dropdown button
-    const userDropdownButton = document.querySelector('.relative.group > button');
-    const userDropdownMenu = document.querySelector('.relative.group > div');
-    userDropdownButton.addEventListener('click', () => {
-      const isVisible = userDropdownMenu.classList.contains('opacity-100');
-      if (isVisible) {
-        userDropdownMenu.classList.remove('opacity-100', 'visible');
-        userDropdownMenu.classList.add('opacity-0', 'invisible');
-      } else {
-        userDropdownMenu.classList.remove('opacity-0', 'invisible');
-        userDropdownMenu.classList.add('opacity-100', 'visible');
-      }
-    });
+<footer class="app-footer mt-5 pt-5 pb-3">
+  <div class="container text-center">
+    <div class="row">
+      <div class="col-md-4 mb-3">
+        <h5 class="text-white fw-bold"><i class="fas fa-briefcase me-2"></i>Portal Links</h5>
+        <ul class="list-unstyled">
+          <li><a href="{{ url_for('job_list') }}">Browse Jobs</a></li>
+          <li><a href="{{ url_for('resources') }}">Resources & Guides</a></li>
+          <li><a href="{{ url_for('advice') }}">Career Advice</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4 mb-3">
+        <h5 class="text-white fw-bold"><i class="fas fa-users-cog me-2"></i>About & Support</h5>
+        <ul class="list-unstyled">
+          <li><a href="{{ url_for('about') }}">About Us</a></li>
+          <li><a href="{{ url_for('contact') }}">Contact</a></li>
+          <li><a href="{{ url_for('support') }}">FAQ/Support</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4 mb-3">
+        <h5 class="text-white fw-bold"><i class="fas fa-tools me-2"></i>Technology</h5>
+        <p class="mb-0">Powered by Python, Flask, MongoDB & Render.</p>
+        <p class="mb-0">Designed with Bootstrap 5 & modern CSS.</p>
+      </div>
+    </div>
+    <hr class="my-4 border-secondary opacity-50">
+<p class="text-muted mb-0">© {{ now.year }} Career Launchpad. All rights reserved.</p>  </div>
+</footer>
 
-    // Close dropdown if clicked outside
-    document.addEventListener('click', (event) => {
-      const isClickInside = userDropdownButton.contains(event.target) || userDropdownMenu.contains(event.target);
-      if (!isClickInside && userDropdownMenu.classList.contains('opacity-100')) {
-        userDropdownMenu.classList.remove('opacity-100', 'visible');
-        userDropdownMenu.classList.add('opacity-0', 'invisible');
-      }
-    });
-  </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Ensure we can get the current year for the footer
+  function now() {
+    return {
+      year: new Date().getFullYear()
+    };
+  }
+
+  // Show all toasts on page load
+  var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+  toastElList.forEach(function(toastEl) { 
+    // Set a longer delay for better user experience
+    new bootstrap.Toast(toastEl, {delay: 6000}).show(); 
+  });
+</script>
 </body>
 </html>
