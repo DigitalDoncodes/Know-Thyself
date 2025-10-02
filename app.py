@@ -419,11 +419,13 @@ def student_dashboard():
         has_active=has_active_application,
     
     )
+
 from datetime import datetime, timezone
 from datetime import datetime, timezone
 from flask import Flask, render_template, current_app 
+@app.context_processor
 def inject_now():
-    # Using the datetime class directly to get the current time
+    # Use the datetime module and class correctly
     return {'now': datetime.utcnow()} 
 @app.route("/apply/<job_id>", methods=["POST"])
 @login_required
