@@ -401,21 +401,7 @@ def student_dashboard():
                  applied_ids.add(app["job_id"])
 
 
-    now_ist = datetime.now(IST) 
-    for app in apps:
-        status = app.get("status", "")
-        if status == "approved":
-            app["status_message"] = "🎉 Yay! Your application is approved."
-        elif status == "rejected":
-            app["status_message"] = "😞 Unfortunately, your application was rejected."
-        elif status == "rejected_auto":
-            app["status_message"] = "⏳ Auto-Rejected. You missed the 48-hour upload window."
-        elif status == "corrections_needed":
-            app["status_message"] = "✍️ Your application needs corrections. Please check feedback."
-        elif status == "submitted":
-             app["status_message"] = "👀 Submitted and under review by the teacher."
-        else:
-            app["status_message"] = ""
+    
 
         # Handle time zone conversion for display
         deadline = app.get("resume_deadline")
@@ -431,9 +417,14 @@ def student_dashboard():
         jobs=jobs,
         applied_ids=applied_ids,
         has_active=has_active_application,
-        now=now_ist
+    
     )
-
+from datetime import datetime, timezone
+from datetime import datetime, timezone
+from flask import Flask, render_template, current_app 
+def inject_now():
+    # Using the datetime class directly to get the current time
+    return {'now': datetime.utcnow()} 
 @app.route("/apply/<job_id>", methods=["POST"])
 @login_required
 def apply(job_id):
