@@ -49,6 +49,7 @@
   .status-rejected, .status-rejected_auto { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
   .status-corrections { background-color: #fffbe6; color: #92400e; border: 1px solid #fcd34d; }
   .status-other { background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
+  .status-needs_corrections { background-color: #fffbe6; color: #92400e; border: 1px solid #fcd34d; } /* Added for needs_corrections */
   
   /* Form/Action Styling */
   .action-form-group {
@@ -177,6 +178,18 @@
                     </button>
                 </form>
 
+                {% with student_email = app.user.email, student_name = app.user.name, job_title = app.job.title %}
+                    
+                    {% set email_subject = 'Update on Your Application: ' + job_title %}
+                    {% set email_body = 'Dear ' + student_name + ',\n\nYour application for ' + job_title + ' has received feedback or a status update. Please log into the Student Dashboard to view the details and any required corrections.\n\nThank you,\nTeacher Review Team' %}
+
+                    <a href="mailto:{{ student_email }}?subject={{ email_subject | urlencode }}&body={{ email_body | urlencode }}"
+                       target="_blank" 
+                       class="btn btn-sm btn-info w-100 mt-2">
+                        <i class="fas fa-paper-plane me-1"></i> Notify Student by Email
+                    </a>
+                    
+                {% endwith %}
                 {% if app.status == 'corrections_needed' or app.status == 'pending_resume' %}
                     <form method="post" action="{{ url_for('reassign_reupload_time', app_id=app._id) }}" class="mt-2 d-grid">
                         <p class="small text-muted my-1">
