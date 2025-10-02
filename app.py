@@ -779,12 +779,64 @@ def export_assessed_students():
     flash("Export functionality is ready but not fully implemented in code.", "warning")
     return redirect(url_for('teacher_dashboard'))
     
+# --- Corrected clear_application function in app.py ---
+
 @app.route('/teacher/clear-applications')
 @login_required 
 @teacher_required
 def clear_application():
-    return render_template('clear_application.html')    
+    # 1. Get Filters from request arguments
+    name_filter = request.args.get("name", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    resume_filter = request.args.get("resume", "").strip()
 
+    # 2. Build the MongoDB Aggregation Pipeline
+    pipeline = [
+        {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+        {"$unwind": "$user"},
+        {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "_id", "as": "job"}},
+        {"$unwind": "$job"},
+        {"$sort": {"applied_at": -1}},
+    ]
+
+    match_filters = {}
+    if name_filter:
+        # Case-insensitive name search on the user's name field
+        match_filters["user.name"] = {"$regex": name_filter, "$options": "i"}
+    if status_filter:
+        match_filters["status"] = status_filter
+    if resume_filter == "uploaded":
+        match_filters["resume_filename"] = {"$exists": True, "$ne": None}
+    elif resume_filter == "not_uploaded":
+        match_filters["resume_filename"] = {"$exists": False}
+
+    if match_filters:
+        pipeline.insert(0, {"$match": match_filters})
+
+    # 3. Execute the query
+    applications = list(mongo.db.applications.aggregate(pipeline))
+
+    # 4. Define template context variables (same as assess_students)
+    all_statuses = [
+        "pending_resume", "submitted", "approved",
+        "rejected", "rejected_auto", "corrections_needed", "job_deleted"
+    ]
+    resume_options = [
+        {"value": "", "label": "All"},
+        {"value": "uploaded", "label": "Resume Uploaded"},
+        {"value": "not_uploaded", "label": "Resume Not Uploaded"},
+    ]
+
+    # 5. Render template and pass the data!
+    return render_template(
+        'clear_application.html',
+        applications=applications,
+        name_filter=name_filter,
+        status_filter=status_filter,
+        resume_filter=resume_filter,
+        statuses=all_statuses,
+        resume_options=resume_options,
+    )
 @app.route('/teacher/students')
 @login_required 
 @teacher_required
